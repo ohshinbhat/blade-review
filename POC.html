@@ -1,0 +1,1192 @@
+<title>Blade PR Review Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+  /* ── Tokens ───────────────────────────────────────────────────────────────
+     Neutrals carry a blue-grey bias, matching Blade's own `blueGrayLight`
+     neutral scale rather than a default mid-grey.                            */
+  :root {
+    --ground:        #FBFCFE;
+    --surface:       #FFFFFF;
+    --surface-sunk:  #F3F6FA;
+    --ink:           #0F141C;
+    --ink-soft:      #39434F;
+    --ink-muted:     #6B7684;
+    --rule:          #E1E7EF;
+    --rule-strong:   #C9D3DF;
+
+    --accent:        #3B4FD8;
+    --accent-soft:   #EEF0FE;
+    --accent-ink:    #2B3AAE;
+
+    --blocker:       #C2334D;
+    --blocker-soft:  #FDEEF1;
+    --warn:          #A8680C;
+    --warn-soft:     #FDF3E4;
+    --pass:          #12794F;
+    --pass-soft:     #E9F6EF;
+
+    --shadow: 0 1px 2px rgba(15, 20, 28, .05), 0 8px 24px -12px rgba(15, 20, 28, .12);
+
+    --display: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+    --measure: 68ch;
+    --s1: .5rem;  --s2: .75rem; --s3: 1rem;   --s4: 1.5rem;
+    --s5: 2rem;   --s6: 3rem;   --s7: 4.5rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:        #0B0F16;
+      --surface:       #121822;
+      --surface-sunk:  #0E141D;
+      --ink:           #E8EDF5;
+      --ink-soft:      #B7C2D0;
+      --ink-muted:     #7C8899;
+      --rule:          #212B39;
+      --rule-strong:   #33404F;
+
+      --accent:        #8C97F5;
+      --accent-soft:   #1A2044;
+      --accent-ink:    #A9B2F8;
+
+      --blocker:       #F0899C;
+      --blocker-soft:  #33161D;
+      --warn:          #E5AE5C;
+      --warn-soft:     #2E2313;
+      --pass:          #66C99A;
+      --pass-soft:     #10281D;
+
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:        #0B0F16;
+    --surface:       #121822;
+    --surface-sunk:  #0E141D;
+    --ink:           #E8EDF5;
+    --ink-soft:      #B7C2D0;
+    --ink-muted:     #7C8899;
+    --rule:          #212B39;
+    --rule-strong:   #33404F;
+
+    --accent:        #8C97F5;
+    --accent-soft:   #1A2044;
+    --accent-ink:    #A9B2F8;
+
+    --blocker:       #F0899C;
+    --blocker-soft:  #33161D;
+    --warn:          #E5AE5C;
+    --warn-soft:     #2E2313;
+    --pass:          #66C99A;
+    --pass-soft:     #10281D;
+
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+
+  /* ── Base ─────────────────────────────────────────────────────────────── */
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 1.0625rem;
+    line-height: 1.68;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--s6);
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: var(--s5) var(--s4) var(--s7);
+  }
+
+  @media (min-width: 1080px) {
+    .page {
+      grid-template-columns: 210px minmax(0, 1fr);
+      gap: var(--s7);
+      padding-inline: var(--s5);
+    }
+  }
+
+  main { min-width: 0; }
+  main > * { max-width: var(--measure); }
+  main > .bleed { max-width: 100%; }
+
+  /* ── Type ─────────────────────────────────────────────────────────────── */
+  h1, h2, h3, h4 {
+    font-family: var(--display);
+    text-wrap: balance;
+    line-height: 1.2;
+    margin: 0;
+  }
+
+  h1 {
+    font-size: clamp(2.1rem, 1.4rem + 2.6vw, 3.1rem);
+    font-weight: 700;
+    letter-spacing: -.028em;
+  }
+
+  h2 {
+    font-size: clamp(1.5rem, 1.2rem + 1.1vw, 1.95rem);
+    font-weight: 600;
+    letter-spacing: -.02em;
+    margin-top: var(--s7);
+    padding-top: var(--s4);
+    border-top: 1px solid var(--rule);
+  }
+
+  h3 {
+    font-size: 1.18rem;
+    font-weight: 600;
+    letter-spacing: -.012em;
+    margin-top: var(--s5);
+  }
+
+  h4 {
+    font-size: .96rem;
+    font-weight: 600;
+    margin-top: var(--s4);
+  }
+
+  p { margin: var(--s3) 0; }
+
+  a { color: var(--accent-ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:hover { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+
+  strong { font-weight: 600; color: var(--ink); }
+
+  code {
+    font-family: var(--mono);
+    font-size: .855em;
+    background: var(--surface-sunk);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: .08em .34em;
+  }
+
+  ul, ol { padding-left: 1.15rem; margin: var(--s3) 0; }
+  li { margin: .38rem 0; }
+  li::marker { color: var(--ink-muted); }
+
+  /* ── Eyebrow / labels ─────────────────────────────────────────────────── */
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: .715rem;
+    font-weight: 500;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    margin: 0 0 var(--s2);
+  }
+
+  /* ── Masthead ─────────────────────────────────────────────────────────── */
+  .masthead { max-width: none; margin-bottom: var(--s6); }
+
+  .lede {
+    font-size: 1.24rem;
+    line-height: 1.56;
+    color: var(--ink-soft);
+    max-width: 58ch;
+    margin-top: var(--s3);
+  }
+
+  .thesis {
+    font-family: var(--display);
+    font-size: 1.06rem;
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--ink);
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+    padding: var(--s3) var(--s4);
+    margin-top: var(--s4);
+    max-width: 62ch;
+  }
+
+  .meta-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s1) var(--s4);
+    font-family: var(--mono);
+    font-size: .765rem;
+    color: var(--ink-muted);
+    margin-top: var(--s4);
+    padding-top: var(--s3);
+    border-top: 1px solid var(--rule);
+  }
+  .meta-strip b { color: var(--ink-soft); font-weight: 500; }
+
+  /* ── Nav rail ─────────────────────────────────────────────────────────── */
+  .rail { display: none; }
+
+  @media (min-width: 1080px) {
+    .rail {
+      display: block;
+      position: sticky;
+      top: var(--s4);
+      align-self: start;
+      max-height: calc(100vh - var(--s6));
+      overflow-y: auto;
+      font-family: var(--display);
+      font-size: .8rem;
+      line-height: 1.4;
+    }
+    .rail ol { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .1rem; }
+    .rail a {
+      display: flex;
+      gap: .6rem;
+      padding: .38rem .5rem;
+      color: var(--ink-muted);
+      text-decoration: none;
+      border-radius: 5px;
+      border-left: 2px solid transparent;
+    }
+    .rail a:hover { color: var(--ink); background: var(--surface-sunk); }
+    .rail .num { font-family: var(--mono); font-size: .7rem; opacity: .65; padding-top: .12rem; }
+  }
+
+  /* ── Panels ───────────────────────────────────────────────────────────── */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: var(--s4);
+    margin: var(--s4) 0;
+    box-shadow: var(--shadow);
+  }
+
+  .panel-tight { padding: var(--s3) var(--s4); }
+
+  .note {
+    background: var(--surface-sunk);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: var(--s3) var(--s4);
+    margin: var(--s4) 0;
+    font-size: .96rem;
+    color: var(--ink-soft);
+  }
+  .note p:first-child { margin-top: 0; }
+  .note p:last-child { margin-bottom: 0; }
+
+  /* ── Code blocks ──────────────────────────────────────────────────────── */
+  .code {
+    font-family: var(--mono);
+    font-size: .795rem;
+    line-height: 1.62;
+    background: var(--surface-sunk);
+    border: 1px solid var(--rule);
+    border-radius: 7px;
+    padding: var(--s3) var(--s4);
+    margin: var(--s3) 0;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--ink-soft);
+  }
+  .code b { color: var(--ink); font-weight: 600; }
+  .code .c { color: var(--ink-muted); }
+  .code .add { color: var(--pass); }
+  .code .del { color: var(--blocker); }
+  .code .k  { color: var(--accent-ink); }
+
+  /* ── Tables ───────────────────────────────────────────────────────────── */
+  .table-wrap { overflow-x: auto; margin: var(--s4) 0; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--display);
+    font-size: .875rem;
+    line-height: 1.45;
+  }
+  th, td {
+    text-align: left;
+    padding: .62rem .8rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  th {
+    font-family: var(--mono);
+    font-size: .7rem;
+    font-weight: 500;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    border-bottom: 1px solid var(--rule-strong);
+    white-space: nowrap;
+  }
+  td code { font-size: .82em; }
+  tbody tr:last-child td { border-bottom: none; }
+  .num-cell { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* ── Metric grid ──────────────────────────────────────────────────────── */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: var(--s4) 0;
+  }
+  .metric { background: var(--surface); padding: var(--s3) var(--s4) var(--s4); }
+  .metric .k {
+    font-family: var(--mono);
+    font-size: .69rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    display: block;
+    margin-bottom: .5rem;
+  }
+  .metric .v {
+    font-family: var(--display);
+    font-size: 1.85rem;
+    font-weight: 600;
+    letter-spacing: -.03em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    display: block;
+  }
+  .metric .d {
+    font-family: var(--display);
+    font-size: .765rem;
+    color: var(--ink-muted);
+    line-height: 1.35;
+    display: block;
+    margin-top: .5rem;
+  }
+  .metric.is-critical .v { color: var(--pass); }
+  .metric.is-accent .v { color: var(--accent); }
+
+  /* ── Verdict chips ────────────────────────────────────────────────────── */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .38rem;
+    font-family: var(--mono);
+    font-size: .7rem;
+    font-weight: 500;
+    letter-spacing: .045em;
+    text-transform: uppercase;
+    padding: .2rem .5rem;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .chip-blocker { background: var(--blocker-soft); color: var(--blocker); }
+  .chip-warn    { background: var(--warn-soft);    color: var(--warn); }
+  .chip-pass    { background: var(--pass-soft);    color: var(--pass); }
+  .chip-accent  { background: var(--accent-soft);  color: var(--accent-ink); }
+
+  /* ── Finding cards: provenance encoded in the border ──────────────────── */
+  .finding {
+    border-left: 3px solid var(--rule-strong);
+    background: var(--surface);
+    border-radius: 0 6px 6px 0;
+    padding: var(--s3) var(--s4);
+    margin: var(--s3) 0;
+    font-size: .93rem;
+  }
+  /* Solid rail = proven by static analysis. Dashed = model judgment.
+     The visual difference is the epistemic difference.                      */
+  .finding.proven    { border-left-style: solid; border-left-color: var(--blocker); }
+  .finding.judgment  { border-left-style: dashed; border-left-color: var(--warn); }
+  .finding .fhead {
+    font-family: var(--mono);
+    font-size: .755rem;
+    letter-spacing: .06em;
+    color: var(--ink-muted);
+    display: flex;
+    gap: .6rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: .45rem;
+  }
+  .finding .fhead b { color: var(--ink); font-weight: 600; letter-spacing: .02em; }
+  .finding p { margin: .3rem 0; }
+  .finding .ev {
+    font-family: var(--mono);
+    font-size: .74rem;
+    color: var(--ink-muted);
+    line-height: 1.55;
+    margin-top: .5rem;
+    padding-left: .8rem;
+    border-left: 1px solid var(--rule);
+  }
+
+  /* ── Layer list: numbering is inherent to the content ─────────────────── */
+  .layers { display: flex; flex-direction: column; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; margin: var(--s4) 0; }
+  .layer { background: var(--surface); padding: var(--s3) var(--s4); display: grid; grid-template-columns: auto 1fr; gap: var(--s3); align-items: start; }
+  .layer .lnum {
+    font-family: var(--mono);
+    font-size: .7rem;
+    font-weight: 600;
+    letter-spacing: .06em;
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+    border-radius: 4px;
+    padding: .22rem .42rem;
+    white-space: nowrap;
+    margin-top: .12rem;
+  }
+  .layer h4 { margin: 0 0 .2rem; font-size: 1rem; }
+  .layer p { margin: 0; font-size: .92rem; color: var(--ink-soft); }
+
+  /* ── Diagram ──────────────────────────────────────────────────────────── */
+  figure { margin: var(--s5) 0; }
+  figure svg { width: 100%; height: auto; display: block; }
+  figcaption {
+    font-family: var(--display);
+    font-size: .8rem;
+    color: var(--ink-muted);
+    margin-top: var(--s2);
+    text-align: center;
+  }
+
+  .svg-frame {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: var(--s4) var(--s3);
+    overflow-x: auto;
+  }
+
+  /* ── Phase list ───────────────────────────────────────────────────────── */
+  .phases { list-style: none; padding: 0; margin: var(--s4) 0; display: flex; flex-direction: column; gap: var(--s3); }
+  .phase {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--s3);
+    padding-bottom: var(--s3);
+    border-bottom: 1px solid var(--rule);
+  }
+  .phase:last-child { border-bottom: none; padding-bottom: 0; }
+  .phase .pnum {
+    font-family: var(--mono);
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+    padding-top: .16rem;
+  }
+  .phase h4 { margin: 0 0 .2rem; display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; }
+  .phase p { margin: 0; font-size: .93rem; color: var(--ink-soft); }
+
+  footer {
+    margin-top: var(--s7);
+    padding-top: var(--s4);
+    border-top: 1px solid var(--rule);
+    font-family: var(--display);
+    font-size: .82rem;
+    color: var(--ink-muted);
+    max-width: var(--measure);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+  html { scroll-behavior: smooth; }
+  h2, h3 { scroll-margin-top: var(--s4); }
+</style>
+
+<div class="page">
+
+  <nav class="rail" aria-label="Contents">
+    <p class="eyebrow">Contents</p>
+    <ol>
+      <li><a href="#problem"><span class="num">01</span><span>The reframe</span></a></li>
+      <li><a href="#scope"><span class="num">02</span><span>What it decides</span></a></li>
+      <li><a href="#architecture"><span class="num">03</span><span>Architecture</span></a></li>
+      <li><a href="#grounding"><span class="num">04</span><span>Grounding</span></a></li>
+      <li><a href="#checks"><span class="num">05</span><span>The three checks</span></a></li>
+      <li><a href="#rulebook"><span class="num">06</span><span>Rulebook</span></a></li>
+      <li><a href="#routing"><span class="num">07</span><span>Routing</span></a></li>
+      <li><a href="#surfaces"><span class="num">08</span><span>Surfaces</span></a></li>
+      <li><a href="#measurement"><span class="num">09</span><span>Measurement</span></a></li>
+      <li><a href="#caught"><span class="num">10</span><span>What evals caught</span></a></li>
+      <li><a href="#plan"><span class="num">11</span><span>Implementation plan</span></a></li>
+      <li><a href="#buildbuy"><span class="num">12</span><span>Build vs buy</span></a></li>
+      <li><a href="#limits"><span class="num">13</span><span>Limitations</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <header class="masthead">
+      <p class="eyebrow">Proof of concept · Design systems</p>
+      <h1>Blade PR Review Agent</h1>
+      <p class="lede">
+        An architectural reviewer for Blade component and property PRs. It decides whether a
+        change was <em>built correctly</em> — and defers to a human on everything else.
+      </p>
+      <p class="thesis">
+        The design-systems reviewer stops being the bottleneck and becomes the author of a
+        machine-enforceable rulebook. Every verdict cites a rule; every rule cites where in
+        the Blade repo it was agreed.
+      </p>
+      <div class="meta-strip">
+        <span><b>Grounded on</b> razorpay/blade @ 4c07772</span>
+        <span><b>94</b> components</span>
+        <span><b>2,146</b> tokens</span>
+        <span><b>844</b> cascade edges</span>
+        <span><b>46</b> eval cases</span>
+        <span><b>22</b> unit tests</span>
+      </div>
+    </header>
+
+    <h2 id="problem">01 · The reframe</h2>
+
+    <p>
+      Design system teams have shifted from creators to checkers. Designers now raise
+      component and property PRs directly, which is the right direction, but one
+      design-systems person cannot meaningfully review PRs from 60+ designers — and most
+      designers have no reason to know how to architect a new property the right way.
+    </p>
+
+    <p>
+      The instinct is to build a reviewer that reads the diff and gives an opinion. At
+      Razorpay's scale that fails on questions any reviewer will ask: the verdicts are
+      non-deterministic, there is no audit trail, the model's knowledge of Blade is frozen at
+      training time, and there is no way to know whether it is actually right.
+    </p>
+
+    <p>
+      So the design starts somewhere else. The agent does not <em>have</em> opinions about
+      Blade; it <em>applies</em> a rulebook the design-systems team owns, against a knowledge
+      graph extracted from Blade's own source. That is what makes it scale: one person cannot
+      review 60 designers' PRs, but one person can maintain rules a system applies to all of
+      them, consistently, with every verdict traceable.
+    </p>
+
+    <h2 id="scope">02 · What it decides, and what it refuses to</h2>
+
+    <p>
+      There are two lenses on any component PR, and conflating them is how these tools lose
+      trust. The agent owns exactly one.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Lens</th><th>Question</th><th>Owner</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Subjective</strong></td>
+            <td>Does this still feel like a Razorpay button? Does it belong in our design language?</td>
+            <td><span class="chip chip-accent">Human</span></td>
+          </tr>
+          <tr>
+            <td><strong>Objective</strong></td>
+            <td>Assuming the requirement is valid, has it been built correctly?</td>
+            <td><span class="chip chip-pass">Agent</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      The system prompt states this boundary explicitly: if a change is architecturally sound
+      but the model has an aesthetic opinion about it, the verdict is <em>correct</em>. The
+      agent is not a taste engine and is instructed not to behave like one.
+    </p>
+
+    <h2 id="architecture">03 · Architecture</h2>
+
+    <p>
+      Four layers, each one narrowing what the next has to handle. The ordering is the whole
+      design: everything mechanically decidable is decided mechanically, so the model only
+      ever sees the residue that genuinely requires judgment.
+    </p>
+
+    <figure class="bleed">
+      <div class="svg-frame">
+        <svg viewBox="0 0 860 320" role="img" aria-labelledby="pipe-title pipe-desc">
+          <title id="pipe-title">The four-layer review pipeline</title>
+          <desc id="pipe-desc">
+            Blade source is extracted into a knowledge graph. A proposed change passes through
+            deterministic checks, then a single model judgment call on what remains, then
+            routing into pass, fail, or defer.
+          </desc>
+
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--rule-strong)"/>
+            </marker>
+          </defs>
+
+          <g font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-muted)" letter-spacing="1">
+            <text x="20" y="26">LAYER 0 · PER RELEASE</text>
+            <text x="20" y="140">LAYER 1 · PER PR</text>
+            <text x="330" y="140">LAYER 2</text>
+            <text x="600" y="140">LAYER 3</text>
+          </g>
+
+          <!-- Layer 0 -->
+          <rect x="20" y="38" width="250" height="62" rx="7" fill="var(--surface-sunk)" stroke="var(--rule-strong)"/>
+          <text x="36" y="62" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="var(--ink)">Blade source → AST</text>
+          <text x="36" y="82" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-muted)">2,146 tokens · 94 components</text>
+
+          <rect x="300" y="38" width="250" height="62" rx="7" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="316" y="62" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="var(--ink)">Knowledge graph</text>
+          <text x="316" y="82" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--accent-ink)">844 token→component edges</text>
+
+          <rect x="580" y="38" width="260" height="62" rx="7" fill="var(--surface-sunk)" stroke="var(--rule-strong)"/>
+          <text x="596" y="62" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="var(--ink)">Rulebook</text>
+          <text x="596" y="82" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-muted)">15 rules, each citing an RFC</text>
+
+          <line x1="270" y1="69" x2="296" y2="69" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#ar)"/>
+          <line x1="550" y1="69" x2="576" y2="69" stroke="var(--rule-strong)" stroke-width="1.5" stroke-dasharray="3 3"/>
+
+          <!-- feed down -->
+          <path d="M425 100 L425 118 L155 118 L155 150" fill="none" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#ar)"/>
+          <path d="M425 100 L425 118 L430 118 L430 150" fill="none" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#ar)"/>
+
+          <!-- Layer 1 -->
+          <rect x="20" y="152" width="270" height="86" rx="7" fill="var(--surface)" stroke="var(--blocker)" stroke-width="1.5"/>
+          <text x="36" y="176" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="var(--ink)">Deterministic checks</text>
+          <text x="36" y="196" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-muted)">literals · duplicates · naming</text>
+          <text x="36" y="211" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-muted)">cascade · parity · variant axes</text>
+          <text x="36" y="229" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--blocker)">~9ms · zero cost · zero variance</text>
+
+          <!-- Layer 2 -->
+          <rect x="330" y="152" width="240" height="86" rx="7" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.5" stroke-dasharray="5 3"/>
+          <text x="346" y="176" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="var(--ink)">Model judgment</text>
+          <text x="346" y="196" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-muted)">one structured call</text>
+          <text x="346" y="211" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-muted)">schema + grounding validated</text>
+          <text x="346" y="229" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--warn)">~3.4k context tokens</text>
+
+          <!-- Layer 3 -->
+          <rect x="610" y="152" width="230" height="86" rx="7" fill="var(--surface)" stroke="var(--rule-strong)"/>
+          <text x="626" y="176" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="var(--ink)">Routing</text>
+          <text x="626" y="198" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--pass)">pass</text>
+          <text x="626" y="213" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--blocker)">fail + suggestion block</text>
+          <text x="626" y="228" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--warn)">defer to human</text>
+
+          <line x1="290" y1="195" x2="326" y2="195" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#ar)"/>
+          <line x1="570" y1="195" x2="606" y2="195" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#ar)"/>
+
+          <text x="292" y="188" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--ink-muted)">residue only</text>
+
+          <!-- proven blockers bypass the model -->
+          <path d="M155 238 L155 275 L725 275 L725 242" fill="none" stroke="var(--blocker)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+          <text x="330" y="292" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--blocker)">a proven blocker cannot be approved away by the model</text>
+        </svg>
+      </div>
+      <figcaption>Extraction runs per Blade release; layers 1–3 run per PR.</figcaption>
+    </figure>
+
+    <div class="layers">
+      <div class="layer">
+        <span class="lnum">L0</span>
+        <div>
+          <h4>Extraction</h4>
+          <p>Parses Blade with the TypeScript compiler API into a typed graph: every token with its literal value, every component's prop unions, and the token→component edges. Regenerated per release, so the agent is never stale and no Blade fact is ever hand-written into a prompt.</p>
+        </div>
+      </div>
+      <div class="layer">
+        <span class="lnum">L1</span>
+        <div>
+          <h4>Deterministic checks</h4>
+          <p>Decides everything mechanically decidable. Exact, free, and identical on every run — which is also what makes the cost story work, since the model never sees what this layer already settled.</p>
+        </div>
+      </div>
+      <div class="layer">
+        <span class="lnum">L2</span>
+        <div>
+          <h4>Judgment</h4>
+          <p>One structured call with a retrieved context bundle. The validator rejects any rule id the model invents and drops any component it hallucinates. Not an agent loop — control flow stays in TypeScript where it can be read, tested and diffed.</p>
+        </div>
+      </div>
+      <div class="layer">
+        <span class="lnum">L3</span>
+        <div>
+          <h4>Routing</h4>
+          <p>Three outcomes, not two. Deliberately asymmetric: a proven blocker cannot be approved away, and an under-confident approval becomes a deferral rather than an approval.</p>
+        </div>
+      </div>
+    </div>
+
+    <h3>Why not just prompt a model with the diff</h3>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th></th><th>Prompt the diff</th><th>This design</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Knowledge of Blade</td><td>frozen at training</td><td>re-extracted per release</td></tr>
+          <tr><td>Cascade claims</td><td>recalled, sometimes wrong</td><td>computed from the AST</td></tr>
+          <tr><td>Same PR twice</td><td>may differ</td><td>proven layer is identical</td></tr>
+          <tr><td>Audit trail</td><td>prose</td><td>rule ids with repo provenance</td></tr>
+          <tr><td>Cost per PR</td><td>whole-repo context</td><td class="num-cell">~3.4k tokens</td></tr>
+          <tr><td>“How do you know it works?”</td><td>—</td><td><code>npm run eval</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="grounding">04 · Grounding on real Blade</h2>
+
+    <p>
+      Everything below was extracted from a live clone of <code>razorpay/blade</code>, not
+      hand-authored. Blade turned out to be unusually well suited to this: it already ships
+      38 per-component token files that map prop combinations to dot-notation token paths,
+      67 <code>_decisions/decisions.md</code> API documents, and an RFC that states the
+      architectural principles outright.
+    </p>
+
+    <div class="metrics">
+      <div class="metric"><span class="k">Components</span><span class="v">94</span><span class="d">with prop unions extracted</span></div>
+      <div class="metric"><span class="k">Tokens</span><span class="v">2,146</span><span class="d">524 global · 427 theme · 1,195 component</span></div>
+      <div class="metric is-accent"><span class="k">Cascade edges</span><span class="v">844</span><span class="d">token → component, all EXTRACTED</span></div>
+      <div class="metric"><span class="k">Docs indexed</span><span class="v">64</span><span class="d">RFCs and decision records</span></div>
+      <div class="metric"><span class="k">Extraction</span><span class="v">2.1s</span><span class="d">full repo, cached as JSON</span></div>
+    </div>
+
+    <h3>Two consumption patterns, both required</h3>
+
+    <p>
+      A naive extractor misses half the graph. Blade components consume tokens two different
+      ways, and only handling both makes cascade analysis correct:
+    </p>
+
+    <div class="code"><span class="c">// 1. semantic tokens, as dot-notation strings in component token files</span>
+<span class="c">//    packages/blade/src/components/Button/BaseButton/buttonTokens.ts</span>
+primary: { default: <b>'interactive.background.primary.default'</b> }
+
+<span class="c">// 2. global tokens, as member access on the theme object</span>
+<span class="c">//    packages/blade/src/components/Switch/AnimatedThumb.web.tsx</span>
+border-radius: ${makeBorderSize(<b>theme.border.radius.max</b>)};
+
+<span class="c">// 3. and the hard case — a computed index</span>
+borderRadius: theme.border.radius[<b>itemBorderRadius[size]</b>]
+<span class="c">//    recorded as `border.radius.[*]`: a change to ANY radius token can</span>
+<span class="c">//    affect this component, so the group is recorded rather than the edge dropped</span></div>
+
+    <div class="note">
+      <p>
+        <strong>On over- versus under-reporting.</strong> The wildcard case is a deliberate
+        choice. A missed consumer is a correctness failure that destroys trust the first time
+        a designer is told “this only affects Card” and it did not. A widened group is a
+        disclosure we can label. So the extractor widens, and says so.
+      </p>
+    </div>
+
+    <h2 id="checks">05 · The three checks</h2>
+
+    <h3>Correct cascading</h3>
+
+    <p>
+      This is the brief's own example, run against real Blade. A designer thinks the Card
+      corners are too round and reduces the shared radius token:
+    </p>
+
+    <div class="code">$ npm run review -- --diff radius.patch "The Card corners look too round."
+
+<span class="del">-    medium: 12,</span>
+<span class="add">+    medium: 8,</span></div>
+
+    <div class="finding proven">
+      <div class="fhead"><span class="chip chip-blocker">Blocker</span><b>CAS-001</b><span>proven by static analysis</span></div>
+      <p><code>border.radius.medium</code> is consumed by <strong>57 components</strong>. Changing its value changes all of them.</p>
+      <div class="ev">
+        Stated target: Card.<br>
+        Not stated but affected: Accordion, ActionList, Alert, AppBar, Avatar, BaseMenu, Box,
+        <strong>Button</strong>, ButtonGroup, Carousel, Charts, ChatInput, Checkbox, Chip, +43 more.
+      </div>
+    </div>
+
+    <div class="finding proven">
+      <div class="fhead"><span class="chip chip-blocker">Blocker</span><b>REUSE-001</b><span>proven by static analysis</span></div>
+      <p>The proposed value <code>8</code> is already encoded by an existing token.</p>
+      <div class="ev">
+        <code>border.radius.small</code> = 8 &nbsp;·&nbsp; tokens/global/border.ts:47<br>
+        <code>spacing.3</code> = 8 &nbsp;·&nbsp; tokens/global/spacing.ts:38
+      </div>
+    </div>
+
+    <div class="finding proven">
+      <div class="fhead"><span class="chip chip-blocker">Blocker</span><b>REUSE-002</b><span>proven by static analysis</span></div>
+      <p>A global token is being changed to serve a single component. Blade's convention is to start local and promote only once a third consumer appears.</p>
+      <div class="ev">→ <code>components/Card/cardTokens.ts</code></div>
+    </div>
+
+    <p>
+      Getting this to fire from the diff alone required real work. A diff hunk shows
+      <code>medium: 8</code> with no nesting context, so the leaf key has to be resolved back
+      to its addressable path by matching the file the edit landed in against the extracted
+      index. Without that resolution step the single most important case this tool exists to
+      catch silently passes.
+    </p>
+
+    <h3>Reuse over duplication</h3>
+
+    <p>
+      Prose intent, no diff. The agent resolves the component name against the graph, then
+      matches the proposed value against the component's real extracted union:
+    </p>
+
+    <div class="code">$ npm run review -- "add a tertiary variant to Button with a green background #0A8000"</div>
+
+    <div class="finding proven">
+      <div class="fhead"><span class="chip chip-blocker">Blocker</span><b>REUSE-003</b></div>
+      <p><code>Button</code> already accepts <code>variant="tertiary"</code>. This variant does not need to be created.</p>
+      <div class="ev">Button.variant allows: <code>primary</code>, <code>secondary</code>, <code>tertiary</code><br>Extracted from source at blade@4c07772, not recalled.</div>
+    </div>
+
+    <div class="finding proven">
+      <div class="fhead"><span class="chip chip-warn">Warning</span><b>ENC-001</b></div>
+      <p>Literal colour <code>#0a8000</code> used where a design token is required.</p>
+      <div class="ev">No existing token holds this value — a genuinely new colour still needs a token, and REUSE-002 says where it should live.</div>
+    </div>
+
+    <h3>Correct encoding</h3>
+
+    <p>
+      The tokens RFC opens by describing the pattern it was written to eliminate: variant
+      styling expressed as <code>switch</code> branches returning values. That description is
+      now a detector, and the rule cites the RFC section it came from.
+    </p>
+
+    <div class="code"><span class="c">// flagged: ENC-002 — variant styling as conditional branches</span>
+<span class="k">switch</span> (variant) {
+  <span class="k">case</span> <b>'tertiary'</b>: <span class="k">return</span> isDisabled ? <b>'light.950'</b> : <b>'light.900'</b>;
+}
+
+<span class="c">// correct: a declarative mapping in the component token file</span>
+<span class="k">const</span> buttonTokens = { base: { tertiary: { default: <b>'surface.background.gray.intense'</b> } } };</div>
+
+    <h2 id="rulebook">06 · The rulebook is the product</h2>
+
+    <p>
+      Fifteen rules across the three categories. The <code>source</code> field is required by
+      the type, because a rule with no provenance is a rule nobody agreed to. Nine are fully
+      decided by a deterministic check and never reach the model.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Rule</th><th>Statement</th><th>Source in repo</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>ENC-001</code></td><td>No hard-coded literal values</td><td>tokens RFC § Summary</td></tr>
+          <tr><td><code>ENC-002</code></td><td>Variant styling is config-driven, not conditional</td><td>tokens RFC § The current state</td></tr>
+          <tr><td><code>ENC-003</code></td><td>Token names follow <code>Object.Base.Modifier</code></td><td>tokens RFC § Creating a new token</td></tr>
+          <tr><td><code>ENC-004</code></td><td>Specificity over flexibility</td><td>tokens RFC § Principles Used</td></tr>
+          <tr><td><code>ENC-005</code></td><td>Component tokens live in the component token file</td><td>tokens RFC § Storing component tokens</td></tr>
+          <tr><td><code>CAS-001</code></td><td>Changing a shared token changes every consumer</td><td>tokens RFC § Overlapping Decisions</td></tr>
+          <tr><td><code>CAS-002</code></td><td>Alias the specific to the generic rather than diverging</td><td>tokens RFC § Overlapping Decisions</td></tr>
+          <tr><td><code>CAS-003</code></td><td>Base-component changes cascade to composites</td><td>blade/CLAUDE.md</td></tr>
+          <tr><td><code>CAS-004</code></td><td>Cross-platform parity between web and native</td><td>cross-platform TypeScript RFC</td></tr>
+          <tr><td><code>REUSE-001</code></td><td>Do not create a token duplicating an existing value</td><td>tokens RFC § Overlapping Decisions</td></tr>
+          <tr><td><code>REUSE-002</code></td><td>Start within, then promote across</td><td>tokens RFC § Principles Used</td></tr>
+          <tr><td><code>REUSE-003</code></td><td>Extend an existing variant axis before creating one</td><td>blade/CLAUDE.md</td></tr>
+          <tr><td><code>REUSE-004</code></td><td>Do not create a component duplicating an existing one</td><td>blade/CLAUDE.md</td></tr>
+          <tr><td><code>REUSE-005</code></td><td>Prop naming consistent with the system</td><td>blade/CLAUDE.md</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="routing">07 · Routing, and the asymmetry that matters</h2>
+
+    <p>
+      A false reject costs a designer one round trip. A false approve puts a wrong pattern
+      into the design system permanently and silently. The two are not symmetric, so the
+      routing is not symmetric either.
+    </p>
+
+    <ul>
+      <li>A <strong>proven blocker cannot be approved away</strong> by the model. That is the point of proving it, and it is covered by a unit test that feeds a confidently-wrong model response into a diff with a real violation.</li>
+      <li>An <strong>under-confident approval becomes a deferral</strong>, never an approval.</li>
+      <li>A <strong>provider failure degrades to <code>needs_human</code></strong>, never to <code>correct</code>, and never hard-fails the build.</li>
+      <li><strong>No findings does not mean correct.</strong> It means the deterministic layer had nothing to say, which is a different claim.</li>
+    </ul>
+
+    <p>
+      The third verdict state is what makes the tool honest. Routing to a human is a correct
+      answer, not a failure — the system prompt says so explicitly, so the model is not
+      pushed toward false confidence to look useful.
+    </p>
+
+    <h2 id="surfaces">08 · Surfaces</h2>
+
+    <p>
+      Both surfaces are roughly fifty-line adapters over one function,
+      <code>review(change) → Verdict</code>. The engine is the product; the form factor is a
+      delivery detail, which also makes the choice reversible.
+    </p>
+
+    <p>
+      The <strong>CLI</strong> works before a PR exists. That is a real product point, not a
+      demo convenience: catching a wrong approach at intent time costs a designer a
+      conversation, while catching it at review time costs them a day of work and a
+      rejection.
+    </p>
+
+    <p>
+      The <strong>CI check</strong> is where it scales to 60 designers without anyone opting
+      in. There is no separate dashboard, deliberately — reviewers already live in the PR, so
+      the PR is the interface:
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Verdict</th><th>GitHub action</th><th>Check</th></tr></thead>
+        <tbody>
+          <tr><td><span class="chip chip-pass">correct</span></td><td>Passing check, no comment — silence is the reward for doing it right</td><td class="num-cell">success</td></tr>
+          <tr><td><span class="chip chip-blocker">incorrect</span></td><td><code>REQUEST_CHANGES</code> with the fix as a <code>suggestion</code> block</td><td class="num-cell">failure</td></tr>
+          <tr><td><span class="chip chip-warn">needs_human</span></td><td>Comment + request review from the DS team, non-blocking</td><td class="num-cell">neutral</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      Two details carry disproportionate weight. The suggestion block renders with a
+      <em>Commit suggestion</em> button, so a designer who does not know the architecture gets
+      the correct implementation applied in one click — “no, and here is the commit” rather
+      than “no, and here is why”. And a deferral is <code>neutral</code>, never
+      <code>failure</code>: a deferral that looks like a broken build teaches a team to ignore
+      the check within a week.
+    </p>
+
+    <h3>The human loop closes back into the evals</h3>
+
+    <p>
+      When the design-systems reviewer disagrees, they reply <code>/ds-agent disagree
+      &lt;reason&gt;</code> in the thread. That override is appended to
+      <code>evals/overrides.jsonl</code> and becomes either a new eval case or a rulebook
+      amendment. The reviewer still handles the uncertain cases, but their review time now
+      compounds instead of evaporating.
+    </p>
+
+    <h2 id="measurement">09 · Measurement</h2>
+
+    <p>
+      This is the part that separates a system from a demo, so it is built as a first-class
+      surface rather than a script. <code>npm run eval</code> reports two arms side by side,
+      which makes the model's contribution a number rather than a claim.
+    </p>
+
+    <div class="metrics">
+      <div class="metric is-critical"><span class="k">False approve</span><span class="v">0.0%</span><span class="d">0 of 44 changes that should be rejected</span></div>
+      <div class="metric is-critical"><span class="k">False reject</span><span class="v">0.0%</span><span class="d">0 of 2 positive controls</span></div>
+      <div class="metric"><span class="k">Verdict accuracy</span><span class="v">95.7%</span><span class="d">n = 46 cases</span></div>
+      <div class="metric"><span class="k">Rule citation</span><span class="v">100%</span><span class="d">right answer for the right reason</span></div>
+      <div class="metric is-accent"><span class="k">Cascade recall</span><span class="v">100%</span><span class="d">deterministic by construction</span></div>
+      <div class="metric"><span class="k">Deferral rate</span><span class="v">8.7%</span><span class="d">routed to a human</span></div>
+    </div>
+
+    <p>
+      Those figures are the <strong>deterministic floor</strong> — Layer 1 only, no API key,
+      no network, fully reproducible. That matters more than a higher number would: it is the
+      guaranteed behaviour of the system, and anyone can clone the repo and reproduce it
+      exactly.
+    </p>
+
+    <h3>Metrics chosen for what they catch</h3>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Metric</th><th>Why it is reported</th></tr></thead>
+        <tbody>
+          <tr><td><strong>False approve rate</strong></td><td>Led with, not accuracy. The asymmetric cost is the entire argument for how routing works.</td></tr>
+          <tr><td><strong>Rule-citation accuracy</strong></td><td>Catches a reviewer that guesses “incorrect” and happens to be right. Raw accuracy hides this completely.</td></tr>
+          <tr><td><strong>Cascade recall</strong></td><td>Should be exactly 100% because it is computed, not recalled. That it <em>is</em> 100% is the evidence for splitting the architecture this way.</td></tr>
+          <tr><td><strong>Run-to-run stability</strong></td><td><code>--runs 3</code> measures flakiness directly, rather than reasoning about whether a non-deterministic reviewer can be trusted.</td></tr>
+          <tr><td><strong>Deferral rate</strong></td><td>Too high and it is useless; too low and it is overconfident. Both failure modes are invisible in accuracy.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Where the cases come from</h3>
+
+    <p>
+      Twelve hand-written goldens covering each rule category, including two positive controls
+      and one deliberately ambiguous case that <em>should</em> defer — without those, a checker
+      that rejects everything scores well. The other 34 come from a <strong>synthetic mutation
+      generator</strong> that takes real, merged, correct Blade source and corrupts it in ways
+      that map one-to-one onto rulebook violations: inline a token's value, duplicate an
+      existing token, re-propose a variant that already exists, edit <code>.web</code> without
+      <code>.native</code>.
+    </p>
+
+    <p>
+      That gives labelled negatives at zero labelling cost, with a distribution across rule
+      categories we control rather than inherit from whatever PRs happened to exist. Mining
+      Blade's real PR history — merged PRs as positives, “changes requested” PRs with the
+      maintainer's comment as negatives with free ground-truth reasoning — is the natural
+      next source, and is listed in the plan below.
+    </p>
+
+    <h2 id="caught">10 · What the eval harness caught</h2>
+
+    <p>
+      Two findings worth reporting, because they are the argument for building the harness at
+      all rather than shipping on vibes.
+    </p>
+
+    <div class="panel">
+      <p class="eyebrow">Finding 01 · the agent corrected me</p>
+      <p>
+        I hand-wrote a case asserting that adding an <code>elevation</code> prop to Card was a
+        genuinely new axis and should defer to a human. The agent returned
+        <code>incorrect</code>. It was right and I was wrong: Card already declares
+        <code>elevation?: keyof Elevation</code> at <code>Card.tsx:85</code>, so the correct
+        verdict is REUSE-003, extend the existing prop.
+      </p>
+      <p>
+        The ground truth was corrected in the case file with the reasoning recorded. This is
+        the clearest demonstration I have that grounding verdicts in extracted source beats
+        recollection — including my own.
+      </p>
+    </div>
+
+    <div class="panel">
+      <p class="eyebrow">Finding 02 · the harness caught my own policy bug</p>
+      <p>
+        The design has a safety rule: signals derived from prose are heuristic, so they cap at
+        <em>warning</em> and never block a PR. The eval run showed that rule was too blunt —
+        it was downgrading findings whose evidence was graph-proven, and the reuse category
+        sat at 62.5%.
+      </p>
+      <p>
+        When the graph proves that <code>Button.variant</code> already accepts
+        <code>"secondary"</code>, only the <em>wish</em> came from prose; the component and the
+        value are both exact matches against unions read off the AST. The fix was to the
+        policy, not the test. Reuse went to 100% and overall accuracy from 75.6% to 95.7%.
+      </p>
+      <p>
+        Tightening that also introduced two false rejects — a prop mentioned in passing
+        (“to control internal padding”) and a negation (“no new props”) were both being read as
+        additive intent. Both are now unit-tested regressions.
+      </p>
+    </div>
+
+    <h2 id="plan">11 · Implementation plan</h2>
+
+    <p>
+      Phases 1–5 are built and running. Phases 6–8 are what I would do next, in priority
+      order.
+    </p>
+
+    <ol class="phases">
+      <li class="phase">
+        <span class="pnum">01</span>
+        <div>
+          <h4>Extraction pipeline <span class="chip chip-pass">done</span></h4>
+          <p>TypeScript compiler API over a Blade checkout. Token index with literal values, component API index with prop unions, and both token-consumption patterns. Cached as a JSON artifact so a CI run costs one file read.</p>
+        </div>
+      </li>
+      <li class="phase">
+        <span class="pnum">02</span>
+        <div>
+          <h4>Rulebook <span class="chip chip-pass">done</span></h4>
+          <p>Fifteen rules distilled from the tokens RFC, the cross-platform RFC and Blade's contributor guidance, each with a required source field and a flag for whether a deterministic check fully covers it.</p>
+        </div>
+      </li>
+      <li class="phase">
+        <span class="pnum">03</span>
+        <div>
+          <h4>Deterministic checks <span class="chip chip-pass">done</span></h4>
+          <p>Eleven checks over a change model that normalises prose intent and unified diffs into structured signals, with the prose/diff provenance boundary enforced throughout.</p>
+        </div>
+      </li>
+      <li class="phase">
+        <span class="pnum">04</span>
+        <div>
+          <h4>Judgment and routing <span class="chip chip-pass">done</span></h4>
+          <p>Retrieval bundle, provider interface with an Anthropic implementation and a deterministic offline provider, schema and grounding validation, and the asymmetric routing rules. 22 unit tests cover the routing invariants.</p>
+        </div>
+      </li>
+      <li class="phase">
+        <span class="pnum">05</span>
+        <div>
+          <h4>Surfaces and evals <span class="chip chip-pass">done</span></h4>
+          <p>CLI, GitHub adapter with suggestion blocks, a workflow that rebuilds the graph from the PR's own checkout, and the two-arm eval harness with the mutation generator.</p>
+        </div>
+      </li>
+      <li class="phase">
+        <span class="pnum">06</span>
+        <div>
+          <h4>Mine Blade's PR history <span class="chip chip-accent">next</span></h4>
+          <p>Merged designer PRs as positives; “changes requested” PRs with maintainer comments as negatives carrying free ground-truth reasoning. Target 150+ real cases so the metrics reflect real designer behaviour rather than synthesised failure modes.</p>
+        </div>
+      </li>
+      <li class="phase">
+        <span class="pnum">07</span>
+        <div>
+          <h4>Override ingestion <span class="chip chip-accent">next</span></h4>
+          <p>Wire <code>/ds-agent disagree</code> through to <code>evals/overrides.jsonl</code> and a weekly triage that turns overrides into eval cases or rulebook amendments. This is what makes the system improve rather than plateau.</p>
+        </div>
+      </li>
+      <li class="phase">
+        <span class="pnum">08</span>
+        <div>
+          <h4>Rule telemetry <span class="chip chip-accent">next</span></h4>
+          <p>Which rules fire most, and which get overridden most. A rule with a high override rate is a wrong rule; a rule that fires constantly marks a part of Blade designers consistently misunderstand. That is an organisational signal, not a code check.</p>
+        </div>
+      </li>
+    </ol>
+
+    <h2 id="buildbuy">12 · Build versus buy</h2>
+
+    <p>
+      I evaluated <strong>Graphify</strong> for the knowledge-graph layer. It does hybrid
+      extraction — tree-sitter for code, LLM extraction for docs — and exposes an MCP server
+      and an HTML visualisation, so the temptation was real.
+    </p>
+
+    <p>
+      I used the idea for the unstructured layer and rejected it for the code layer, for two
+      reasons. First, a generic code graph yields symbol-level edges
+      (<code>Button.tsx imports tokens.ts</code>), not the design-system-semantic edges the
+      three checks actually need — resolving a styled-components template through a theme
+      object into a specific token, indexed by component and variant, is Blade-specific
+      modelling and is the actual IP here. Second, Graphify labels edges
+      <code>EXTRACTED</code> / <code>INFERRED</code> / <code>AMBIGUOUS</code>, and for a
+      blocking check an inferred cascade edge is a liability, not a feature.
+    </p>
+
+    <p>
+      Writing it directly against the compiler API also collapsed the dependency tree to a
+      single runtime package — <code>typescript</code>, which Blade already ships. The
+      Anthropic call is plain <code>fetch</code>, because a blocking CI check should own its
+      timeout and retry policy rather than inherit them from an SDK.
+    </p>
+
+    <h2 id="limits">13 · Limitations</h2>
+
+    <p>Stated plainly, because a POC that claims no weaknesses is not being read carefully.</p>
+
+    <ul>
+      <li><strong>Prose parsing is heuristic where it is not graph-backed.</strong> This is why prose-derived signals are capped at warning unless the graph proves them. The boundary is enforced in code, but it is a boundary, not a solution.</li>
+      <li><strong>Prop extraction does not resolve cross-file type references.</strong> It builds a local alias table per file and flattens unions and intersections through it, which covers Blade's actual composition patterns, but a prop type imported from another module is not followed. A full type-checker program would fix this at a real cost in extraction time.</li>
+      <li><strong>The judgment layer's contribution is currently unmeasured.</strong> Both eval arms report identical numbers because no API key was available in the build environment, so the offline provider ran in both. The harness is built to show that delta; the delta itself is the first thing to fill in.</li>
+      <li><strong>The two positive controls cannot pass offline.</strong> The offline provider structurally never returns <code>correct</code>, which is honest but means the floor's ceiling is 95.7% by construction, not by failure.</li>
+      <li><strong>The rulebook is my reading of Blade's RFCs.</strong> It is sourced and citable, but a real deployment starts with the design-systems team editing it, which is exactly the intended workflow.</li>
+    </ul>
+
+    <footer>
+      <p>
+        Built against <code>razorpay/blade</code> @ <code>4c07772</code>. Extraction, checks,
+        engine, CLI, CI adapter, unit tests and eval harness run end to end with no API key.
+      </p>
+    </footer>
+
+  </main>
+</div>

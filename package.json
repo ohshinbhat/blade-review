@@ -1,0 +1,22 @@
+{
+  "name": "blade-pr-review-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Architectural review agent for Blade design-system component/property PRs",
+  "scripts": {
+    "extract": "tsx src/cli/extract.ts",
+    "review": "tsx src/cli/index.ts",
+    "eval": "tsx evals/run.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/__tests__/*.test.ts"
+  },
+  "dependencies": {
+    "typescript": "^5.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}

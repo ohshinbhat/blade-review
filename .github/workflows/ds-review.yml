@@ -1,0 +1,61 @@
+name: Design System Architecture Review
+
+# Runs on any PR that touches Blade's component or token surface. The check is
+# advisory-by-default: it fails only on a proven or judged violation, and a
+# deferral to the design systems team is reported as neutral, never as a failure.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'packages/blade/src/components/**'
+      - 'packages/blade/src/tokens/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+concurrency:
+  group: ds-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  architecture-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Blade
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout review agent
+        uses: actions/checkout@v4
+        with:
+          repository: razorpay/blade-pr-review-agent
+          path: .ds-agent
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install agent
+        working-directory: .ds-agent
+        run: npm ci --omit=dev
+
+      # The knowledge graph is rebuilt from the PR's own checkout, so the agent
+      # reviews against the Blade the PR is actually modifying — not a stale index.
+      - name: Build knowledge graph
+        working-directory: .ds-agent
+        run: npx tsx src/cli/extract.ts --blade "$GITHUB_WORKSPACE" --out data/blade-graph.json
+
+      - name: Review PR
+        working-directory: .ds-agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Without the key the agent still runs, at the deterministic floor.
+        run: npx tsx src/cli/ci.ts --graph data/blade-graph.json --team razorpay/design-system

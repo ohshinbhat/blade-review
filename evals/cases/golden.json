@@ -1,0 +1,151 @@
+[
+  {
+    "id": "gold-001-hardcoded-hex-new-variant",
+    "origin": "handwritten",
+    "category": "encoding",
+    "intent": "I want to add a tertiary variant to Button with a custom green background #0A8000.",
+    "diff": "diff --git a/packages/blade/src/components/Button/BaseButton/StyledBaseButton.web.tsx b/packages/blade/src/components/Button/BaseButton/StyledBaseButton.web.tsx\n--- a/packages/blade/src/components/Button/BaseButton/StyledBaseButton.web.tsx\n+++ b/packages/blade/src/components/Button/BaseButton/StyledBaseButton.web.tsx\n@@ -20,4 +20,8 @@\n+  background-color: #0A8000;\n+  border-radius: 12px;\n",
+    "expected": {
+      "status": "incorrect",
+      "rules": ["ENC-001", "REUSE-003"]
+    },
+    "rationale": "Two violations. The hex and the 12px bypass tokens (12 is border.radius.medium / spacing.4), and Button already exposes variant=\"tertiary\", so the variant does not need creating."
+  },
+  {
+    "id": "gold-002-global-radius-change",
+    "origin": "handwritten",
+    "category": "cascading",
+    "intent": "The Card corners look too round. I want to change border.radius.medium from 12 to 8.",
+    "diff": "diff --git a/packages/blade/src/tokens/global/border.ts b/packages/blade/src/tokens/global/border.ts\n--- a/packages/blade/src/tokens/global/border.ts\n+++ b/packages/blade/src/tokens/global/border.ts\n@@ -45,7 +45,7 @@\n-    medium: 12,\n+    medium: 8,\n",
+    "expected": {
+      "status": "incorrect",
+      "rules": ["CAS-001"],
+      "affectedComponents": ["Button", "Card"]
+    },
+    "rationale": "The interviewer's own example. A shared radius token is being changed to fix one component; the change silently reshapes every other consumer."
+  },
+  {
+    "id": "gold-003-duplicate-spacing-token",
+    "origin": "handwritten",
+    "category": "reuse",
+    "intent": "Add a new spacing token called gutter with value 16 for the new layout.",
+    "diff": "diff --git a/packages/blade/src/tokens/global/spacing.ts b/packages/blade/src/tokens/global/spacing.ts\n--- a/packages/blade/src/tokens/global/spacing.ts\n+++ b/packages/blade/src/tokens/global/spacing.ts\n@@ -40,3 +40,4 @@\n+  gutter: 16,\n",
+    "expected": {
+      "status": "incorrect",
+      "rules": ["REUSE-001"]
+    },
+    "rationale": "spacing.5 is already 16. A second name for the same value fragments the scale."
+  },
+  {
+    "id": "gold-004-switch-based-variant-styling",
+    "origin": "handwritten",
+    "category": "encoding",
+    "intent": "Wire up the styling for the new emphasis on Alert.",
+    "diff": "diff --git a/packages/blade/src/components/Alert/Alert.tsx b/packages/blade/src/components/Alert/Alert.tsx\n--- a/packages/blade/src/components/Alert/Alert.tsx\n+++ b/packages/blade/src/components/Alert/Alert.tsx\n@@ -80,6 +80,12 @@\n+  switch (emphasis) {\n+    case 'intense':\n+      return isDisabled ? 'surface.text.gray.disabled' : 'surface.text.gray.normal';\n+    default:\n+      return 'surface.text.gray.subtle';\n+  }\n",
+    "expected": {
+      "status": "incorrect",
+      "rules": ["ENC-002"]
+    },
+    "rationale": "This is verbatim the pattern the tokens RFC was written to eliminate. The mapping belongs in the component token file."
+  },
+  {
+    "id": "gold-005-web-only-styling-change",
+    "origin": "handwritten",
+    "category": "cascading",
+    "intent": "Tighten the pressed state on Checkbox.",
+    "diff": "diff --git a/packages/blade/src/components/Checkbox/StyledCheckbox.web.tsx b/packages/blade/src/components/Checkbox/StyledCheckbox.web.tsx\n--- a/packages/blade/src/components/Checkbox/StyledCheckbox.web.tsx\n+++ b/packages/blade/src/components/Checkbox/StyledCheckbox.web.tsx\n@@ -12,3 +12,5 @@\n+  transform: scale(0.98);\n",
+    "expected": {
+      "status": "incorrect",
+      "rules": ["CAS-004"]
+    },
+    "rationale": "Checkbox ships both platforms. A web-only interaction change is a parity break."
+  },
+  {
+    "id": "gold-006-negated-boolean-prop",
+    "origin": "handwritten",
+    "category": "reuse",
+    "intent": "Add an isNotDismissible prop to Alert so some alerts cannot be closed.",
+    "diff": "diff --git a/packages/blade/src/components/Alert/types.ts b/packages/blade/src/components/Alert/types.ts\n--- a/packages/blade/src/components/Alert/types.ts\n+++ b/packages/blade/src/components/Alert/types.ts\n@@ -10,3 +10,4 @@\n+  isNotDismissible?: 'yes' | 'no';\n",
+    "expected": {
+      "status": "incorrect",
+      "rules": ["REUSE-005"]
+    },
+    "rationale": "Negated boolean prop names are explicitly forbidden in Blade's contributor guidance."
+  },
+  {
+    "id": "gold-007-existing-variant-value",
+    "origin": "handwritten",
+    "category": "reuse",
+    "intent": "Can I add a secondary variant to Button?",
+    "expected": {
+      "status": "incorrect",
+      "rules": ["REUSE-003"]
+    },
+    "rationale": "Button.variant already accepts \"secondary\". Pure reuse case, prose only, no diff."
+  },
+  {
+    "id": "gold-008-premature-global-promotion",
+    "origin": "handwritten",
+    "category": "reuse",
+    "intent": "Avatar needs a 14px radius, so I'm adding avatarRadius to the global border tokens.",
+    "diff": "diff --git a/packages/blade/src/tokens/global/border.ts b/packages/blade/src/tokens/global/border.ts\n--- a/packages/blade/src/tokens/global/border.ts\n+++ b/packages/blade/src/tokens/global/border.ts\n@@ -50,3 +50,4 @@\n+    avatarRadius: 14,\n",
+    "expected": {
+      "status": "incorrect",
+      "rules": ["REUSE-002"]
+    },
+    "rationale": "Start within, then promote across. One consumer means the token stays local to Avatar."
+  },
+  {
+    "id": "gold-101-correct-component-token-extension",
+    "origin": "handwritten",
+    "category": "encoding",
+    "intent": "Extend Chip's existing component token file to map the existing intent values to existing theme colour tokens. No new tokens, no new props.",
+    "diff": "diff --git a/packages/blade/src/components/Chip/chipTokens.ts b/packages/blade/src/components/Chip/chipTokens.ts\n--- a/packages/blade/src/components/Chip/chipTokens.ts\n+++ b/packages/blade/src/components/Chip/chipTokens.ts\n@@ -30,4 +30,8 @@\n+  positive: {\n+    background: 'interactive.background.positive.default',\n+    border: 'interactive.border.positive.default',\n+  },\n",
+    "expected": {
+      "status": "correct"
+    },
+    "rationale": "Positive control. Config-driven, in the right file, referencing existing theme tokens, no duplication. If the agent flags this it is over-rejecting."
+  },
+  {
+    "id": "gold-102-correct-cross-platform-pair",
+    "origin": "handwritten",
+    "category": "cascading",
+    "intent": "Adjust the pressed state on Checkbox, on both platforms.",
+    "diff": "diff --git a/packages/blade/src/components/Checkbox/StyledCheckbox.web.tsx b/packages/blade/src/components/Checkbox/StyledCheckbox.web.tsx\n--- a/packages/blade/src/components/Checkbox/StyledCheckbox.web.tsx\n+++ b/packages/blade/src/components/Checkbox/StyledCheckbox.web.tsx\n@@ -12,3 +12,4 @@\n+  opacity: theme.opacity[8];\ndiff --git a/packages/blade/src/components/Checkbox/StyledCheckbox.native.tsx b/packages/blade/src/components/Checkbox/StyledCheckbox.native.tsx\n--- a/packages/blade/src/components/Checkbox/StyledCheckbox.native.tsx\n+++ b/packages/blade/src/components/Checkbox/StyledCheckbox.native.tsx\n@@ -12,3 +12,4 @@\n+  opacity: theme.opacity[8],\n",
+    "expected": {
+      "status": "correct"
+    },
+    "rationale": "Positive control for CAS-004. Both platforms changed, token referenced rather than a literal."
+  },
+  {
+    "id": "gold-103-elevation-prop-already-exists",
+    "origin": "handwritten",
+    "category": "reuse",
+    "intent": "Add a `elevation` prop to Card with values none and raised, mapped through Card's token file to existing elevation tokens.",
+    "expected": {
+      "status": "incorrect",
+      "rules": ["REUSE-003"]
+    },
+    "rationale": "GROUND TRUTH CORRECTED. This case was originally written as `needs_human` on the assumption that elevation was a genuinely new axis for Card. The extractor showed that Card already declares `elevation?: keyof Elevation` at Card.tsx:85, so the correct verdict is REUSE-003 — extend the existing prop. The agent was right and the hand-written label was wrong; this is the case for grounding verdicts in extracted source rather than recollection."
+  },
+  {
+    "id": "gold-105-genuinely-new-axis-ambiguous",
+    "origin": "handwritten",
+    "category": "reuse",
+    "intent": "Add a `density` prop to Card with values comfortable and compact, to control internal padding.",
+    "expected": {
+      "status": "needs_human"
+    },
+    "rationale": "Replaces the original ambiguity control. Card has no `density` prop and no equivalent axis, so nothing is mechanically wrong. Whether Blade should grow a density axis at all is a design-language decision, and the right behaviour is to defer rather than guess."
+  },
+  {
+    "id": "gold-104-underspecified-intent",
+    "origin": "handwritten",
+    "category": "encoding",
+    "intent": "I want to make the buttons look better.",
+    "expected": {
+      "status": "needs_human"
+    },
+    "rationale": "Control for over-eagerness. There is nothing here to judge; approving or rejecting would both be wrong."
+  }
+]
