@@ -20,7 +20,7 @@ import * as fs from 'fs';
 import type { TokenUsageEdge } from '../types.js';
 import { parseFile } from './tokens.js';
 
-const SKIP = /(__tests__|__snapshots__|\.stories\.|\.test\.|\/docs\/)/;
+const SKIP = /(__tests__|\.stories\.|\.test\.|\/docs\/)/;
 
 function walkFiles(dir: string, out: string[] = []): string[] {
   let entries: fs.Dirent[];

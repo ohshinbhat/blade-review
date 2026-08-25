@@ -56,7 +56,7 @@ instead of tacit, and the reviewer's time compounds instead of evaporating.
 ## Architecture
 
 ```
-Layer 0   EXTRACTION      Blade source/diff ──AST──▶ graph + JSX/snapshot facts
+Layer 0   EXTRACTION      Blade source/diff ──AST──▶ graph + JSX facts
 Layer 1A  DETERMINISTIC   tokens, APIs, cascade ──▶ proven findings     (free)
 Layer 1B  UI STRUCTURE    JSX subtree ──▶ existing-component reuse plan (advisory)
 Layer 2   JUDGMENT        residue ──▶ one structured LLM call           (~3k tokens)
@@ -70,8 +70,8 @@ base-commit and PR-head graphs: prior-art checks use the base graph, while casca
 state checks use the head graph, so a newly added variant is not mistaken for pre-existing code.
 
 **Layer 1A** decides everything mechanically decidable — literal values, duplicate tokens,
-naming hierarchy, cross-platform parity, existing variant axes, JSX composition, and resolved
-snapshot output. Zero variance, zero model cost.
+naming hierarchy, source-level cross-platform parity, existing variant axes, and JSX
+composition. Zero variance, zero model cost.
 
 **Layer 1B** summarizes an entire added JSX subtree and asks the extracted component catalog
 which raw elements already have Blade equivalents. A structure such as
@@ -97,7 +97,7 @@ the model, and an under-confident approval becomes a deferral rather than an app
 | Cost per PR | whole-repo context | ~3k tokens |
 | "How do you know it works?" | — | `npm run eval` |
 
-## Five checks
+## Four checks
 
 | Check | Mechanism |
 |---|---|
@@ -105,7 +105,6 @@ the model, and an under-confident approval becomes a deferral rather than an app
 | **Correct cascading** | Token→component graph plus component/file-surface web/native parity. `border.radius.medium` resolves to its 57 real consumers, so a "just fix Card" change is shown to touch Button, Chip, Alert and 53 others |
 | **Reuse over duplication** | Exact value match against base-commit tokens; proposed variants matched against base prop unions; new-component prop surfaces ranked against existing components for grounded REUSE-004 judgment |
 | **Correct composition** | JSX tree read off the AST of diff-added lines only (contiguous added-line blocks, never stitched across unrelated hunks); raw intrinsics checked against a verified Blade-primitive mapping; whole subtrees summarized into existing-component reuse plans; inline `style`/`css` props, illegal nesting, and variant literals checked against extracted APIs |
-| **Correct render output** | Already-diffed jest `.snap` files parsed for their fully-resolved CSS — no rendering, no Storybook. Resolved px values checked against the token scale; web/native snapshots of the same story compared for matching resolved values when both sides changed in the diff |
 
 ## Surfaces
 
@@ -122,8 +121,8 @@ product; the form factor is a delivery detail.
 
 ### Sample pull request workflow
 
-`tmp/ui-cases/` contains a clean active component, six component scenarios,
-three rendered-snapshot fixtures, and a small committed sample graph. Copy a
+`tmp/ui-cases/` contains a clean active component, eight TSX scenarios, and a
+small committed sample graph. Copy a
 catalog case over the active component and open a sample PR; the self-contained
 `.github/workflows/sample-pr-review.yml` workflow runs the review, posts results
 for same-repository branches, and writes a read-only Actions summary for forks.
@@ -166,13 +165,11 @@ cost, with a distribution we control. Graph-derived positive controls prevent a 
 reviewer from hiding behind class imbalance. The report includes correct-approval recall and
 automatic decision coverage; when a remote judgment provider is configured, both are gated.
 
-The offline provider is a safety baseline, not an automatic approver. In the current 75-case
-suite (58 original plus 17 composition/render cases) it proves 53 incorrect changes, defers all
-16 correct controls and 6 ambiguous cases, and records zero false approvals or false rejections
-— rule-citation accuracy and cascade recall are both 100%. Composition cases score 90.0%
-accuracy and render cases 85.7%; every "failure" in both is the same documented pattern as the
-original categories — the offline provider deferring a positive control to `needs_human` rather
-than approving it outright, never a false approve. A configured model must approve at least
+The offline provider is a safety baseline, not an automatic approver. The eval suite reports its
+deterministic floor separately from the configured judgment provider, including false approvals,
+false rejections, rule-citation accuracy, cascade recall, deferrals, and decision coverage.
+Positive controls intentionally defer offline rather than becoming unsafe automatic approvals.
+A configured model must approve at least
 50% of correct controls and make an automatic decision on at least 75% of cases by default.
 Override those thresholds with `EVAL_MIN_CORRECT_APPROVAL_RATE` and
 `EVAL_MIN_DECISION_COVERAGE` when deliberately testing a different operating point.
@@ -180,12 +177,10 @@ Override those thresholds with `EVAL_MIN_CORRECT_APPROVAL_RATE` and
 ## Layout
 
 ```
-src/extract/      Layer 0 — AST → knowledge graph; jsx.ts (JSX composition extractor) and
-                  snapshot.ts (jest .snap parser) feed the composition/render checks
+src/extract/      Layer 0 — AST → knowledge graph; jsx.ts extracts added JSX structure
 src/knowledge/    rulebook (sourced from Blade RFCs) + retrieval
 src/checks/       Layer 1A/1B — deterministic checks; composition.ts checks individual JSX,
-                  structure.ts produces subtree reuse plans (COMP-003), and render.ts checks
-                  resolved snapshots (REND-001, REND-002)
+                  and structure.ts produces subtree reuse plans (COMP-003)
 src/engine/       Layer 2/3 — prompt, providers, routing
 src/cli/          CLI + CI entry points
 src/ci/           GitHub review formatting
@@ -197,6 +192,6 @@ evals/            golden cases, mutation generator, metrics
 - Runtime dependency: `typescript` only. Anthropic and OpenRouter-compatible calls use plain
   `fetch`; a blocking CI check owns its timeout and bounded retry policy.
 - `npm run typecheck` requires `@types/node` from a normal `npm install`.
-- UI-structure reuse is semantic, not visual: it does not compare screenshots or decide whether
+- UI-structure reuse is semantic, not visual: it reviews TSX source and does not decide whether
   a UI looks like Razorpay. Extraction is best-effort for complete contiguous JSX blocks added
   by the diff; incomplete prop-only hunks are deliberately left for human/model judgment.

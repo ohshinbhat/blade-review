@@ -111,7 +111,7 @@ export interface ProposedChange {
 // Layer 1A/1B — deterministic findings and semantic UI-structure reuse
 // ---------------------------------------------------------------------------
 
-export type CheckCategory = 'encoding' | 'cascading' | 'reuse' | 'composition' | 'render';
+export type CheckCategory = 'encoding' | 'cascading' | 'reuse' | 'composition';
 
 export type Severity = 'blocker' | 'warning' | 'info';
 

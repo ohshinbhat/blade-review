@@ -120,7 +120,7 @@ export const RULEBOOK: Rule[] = [
     category: 'cascading',
     severity: 'blocker',
     statement:
-      'A change to a Base/primitive component propagates to every component that composes it. All composing components must be considered, and their snapshots and stories updated.',
+      'A change to a Base/primitive component propagates to every component that composes it. All composing components and their stories must be considered.',
     source: `${BLADE_AGENTS} § Common Patterns — component structures must stay consistent across the system.`,
     deterministic: true,
   },
@@ -263,35 +263,6 @@ export const RULEBOOK: Rule[] = [
       incorrect: '<Button variant="quaternary">Pay</Button>  // Button.variant only allows primary | secondary | tertiary',
       correct: '<Button variant="tertiary">Pay</Button>',
     },
-  },
-
-  // ---------------------------------------------------------------------
-  // Correct render output — what the change actually renders
-  // ---------------------------------------------------------------------
-  {
-    id: 'REND-001',
-    title: 'Rendered values must land on the token scale',
-    category: 'render',
-    severity: 'blocker',
-    statement:
-      'Every resolved pixel value in a diffed snapshot must match an existing token value. This is ENC-001 checked on the computed output rather than the source literal — it catches a value that emerged from arithmetic, a wrong theme lookup, or a bad prop default, which no source-level check can see because no literal was ever typed.',
-    source: `${RFC_TOKENS} § Summary — the same "tokens replace hard-coded properties" requirement as ENC-001, applied to what the component actually renders instead of what was written by hand.`,
-    deterministic: true,
-    examples: {
-      incorrect: 'snapshot shows `padding: 15px;` (no token holds 15 — 16 is spacing.5)',
-      correct: 'snapshot shows `padding: 16px;` (spacing.5)',
-    },
-  },
-  {
-    id: 'REND-002',
-    title: 'Web and native must render the same resolved values',
-    category: 'render',
-    severity: 'blocker',
-    statement:
-      'When a diff updates both the web and native snapshot of the same story, the resolved values for layout-affecting properties (padding, margin, border-radius, gap, size, font-size) must match. This is CAS-004 checked on rendered output: two files can each look correct in isolation and still leave the two platforms rendering different things.',
-    source:
-      'rfcs/writing-cross-platform-typescript.md — the same single-codebase parity requirement CAS-004 enforces on source files, checked here on the two platforms’ actual resolved output.',
-    deterministic: true,
   },
 ];
 

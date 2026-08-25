@@ -284,6 +284,5 @@ function inferCategory(ruleIds: string[]): Finding['category'] {
   if (id.startsWith('CAS')) return 'cascading';
   if (id.startsWith('REUSE')) return 'reuse';
   if (id.startsWith('COMP')) return 'composition';
-  if (id.startsWith('REND')) return 'render';
   return 'encoding';
 }

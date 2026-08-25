@@ -16,8 +16,6 @@ import type { ProposedChange } from '../types.js';
 import type { BladeGraph } from '../extract/graph.js';
 import type { JsxNode } from '../extract/jsx.js';
 import { extractJsxFromDiff } from '../extract/jsx.js';
-import type { SnapshotDiffFile } from '../extract/snapshot.js';
-import { parseSnapshotDiff, isSnapshotFile } from '../extract/snapshot.js';
 
 export interface DiffFile {
   path: string;
@@ -68,8 +66,6 @@ export interface ChangeModel {
    * this is best-effort rather than a full-checkout parse.
    */
   jsxComposition: { file: string; roots: JsxNode[] }[];
-  /** Parsed `.snap` diffs — Layer 0 for the render-output checks. See `extract/snapshot.ts`. */
-  snapshotDiffs: SnapshotDiffFile[];
 }
 
 const HEX_RE = /#(?:[0-9a-fA-F]{3,8})\b/g;
@@ -166,7 +162,6 @@ export function buildChangeModel(change: ProposedChange, graph: BladeGraph): Cha
     proposesNewComponent: false,
     touchesSharedTokenModule: false,
     jsxComposition: [],
-    snapshotDiffs: [],
   };
 
   // ---- signals from the diff (exact) -------------------------------------
@@ -180,12 +175,6 @@ export function buildChangeModel(change: ProposedChange, graph: BladeGraph): Cha
     if (/\.tsx$/.test(f.path) && !/\.(stories|test)\./.test(f.path)) {
       const roots = extractJsxFromDiff(f, bladeNames);
       if (roots.length) model.jsxComposition.push({ file: f.path, roots });
-    }
-
-    // Render output — resolved CSS already sitting in a touched snapshot, for the REND-* checks.
-    if (isSnapshotFile(f.path)) {
-      const parsed = parseSnapshotDiff(f);
-      if (parsed && parsed.stories.length) model.snapshotDiffs.push(parsed);
     }
 
     // A changed union appears in a diff as the complete before/after line. Only
