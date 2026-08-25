@@ -157,6 +157,31 @@ describe('provider compatibility', () => {
       restoreEnv('BLADE_REVIEW_MODEL', previous.model);
     }
   });
+
+  test('uses provider defaults when unset Actions variables arrive as empty strings', () => {
+    const previous = {
+      anthropic: process.env.ANTHROPIC_API_KEY,
+      openrouter: process.env.OPENROUTER_API_KEY,
+      provider: process.env.BLADE_REVIEW_PROVIDER,
+      model: process.env.BLADE_REVIEW_MODEL,
+      baseUrl: process.env.BLADE_REVIEW_BASE_URL,
+    };
+    try {
+      delete process.env.ANTHROPIC_API_KEY;
+      process.env.OPENROUTER_API_KEY = 'test-key';
+      process.env.BLADE_REVIEW_PROVIDER = '';
+      process.env.BLADE_REVIEW_MODEL = '';
+      process.env.BLADE_REVIEW_BASE_URL = '';
+      const provider = createProvider(GRAPH, {});
+      assert.equal(provider.name, 'openrouter:openai/gpt-4o-mini');
+    } finally {
+      restoreEnv('ANTHROPIC_API_KEY', previous.anthropic);
+      restoreEnv('OPENROUTER_API_KEY', previous.openrouter);
+      restoreEnv('BLADE_REVIEW_PROVIDER', previous.provider);
+      restoreEnv('BLADE_REVIEW_MODEL', previous.model);
+      restoreEnv('BLADE_REVIEW_BASE_URL', previous.baseUrl);
+    }
+  });
 });
 
 function restoreEnv(name: string, value: string | undefined): void {
@@ -415,8 +440,8 @@ describe('github adapter', () => {
     assert.ok(gh.requestReviewers.length > 0, 'a deferral should request the DS team');
   });
 
-  test('repository-local demos can disable reviewer assignment without changing neutrality', async () => {
-    const v = await review({ intent: 'ambiguous demo UI' }, GRAPH, {
+  test('repository-local samples can disable reviewer assignment without changing neutrality', async () => {
+    const v = await review({ intent: 'ambiguous sample UI' }, GRAPH, {
       provider: stubProvider({
         status: 'needs_human',
         confidence: 0.4,
@@ -429,7 +454,8 @@ describe('github adapter', () => {
     const gh = toGitHubReview(v, 'razorpay/design-system', false);
     assert.equal(gh.conclusion, 'neutral');
     assert.deepEqual(gh.requestReviewers, []);
-    assert.match(gh.body, /Reviewer assignment is disabled/);
+    assert.match(gh.body, /Automatic reviewer assignment is disabled/);
+    assert.equal(gh.checkTitle, 'Human architecture review required');
   });
 
   test('a blocking verdict requests changes and carries a suggestion block', async () => {

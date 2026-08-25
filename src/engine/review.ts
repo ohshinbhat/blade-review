@@ -64,8 +64,8 @@ export function createProvider(
 
     return new OpenAICompatibleProvider({
       apiKey,
-      model: process.env.BLADE_REVIEW_MODEL ?? 'openai/gpt-4o-mini',
-      baseUrl: process.env.BLADE_REVIEW_BASE_URL ?? 'https://openrouter.ai/api/v1',
+      model: process.env.BLADE_REVIEW_MODEL || 'openai/gpt-4o-mini',
+      baseUrl: process.env.BLADE_REVIEW_BASE_URL || 'https://openrouter.ai/api/v1',
       providerName: 'openrouter',
       headers,
       knownRuleIds,

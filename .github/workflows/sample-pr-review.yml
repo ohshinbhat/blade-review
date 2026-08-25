@@ -1,0 +1,118 @@
+name: Blade Architecture Review
+
+# Self-contained sample workflow for this repository. It reviews only the
+# fixture under tmp/ui-cases/active; the production Blade workflow extracts
+# real base and head graphs from razorpay/blade.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'tmp/ui-cases/active/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+concurrency:
+  group: blade-architecture-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  architecture-review:
+    name: Architecture review
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare pull request diff
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --find-renames --unified=80 "$BASE_SHA" "$HEAD_SHA" -- tmp/ui-cases/active > "$RUNNER_TEMP/blade-review.patch"
+          test -s "$RUNNER_TEMP/blade-review.patch"
+
+      # Same-repository branches have a writable GITHUB_TOKEN, so this posts the
+      # real PR review and verdict check. Reviewer assignment is disabled for
+      # this sample repository because it does not have Razorpay's team setup.
+      - name: Run architecture review
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          BLADE_REVIEW_PROVIDER: ${{ vars.BLADE_REVIEW_PROVIDER }}
+          BLADE_REVIEW_MODEL: ${{ vars.BLADE_REVIEW_MODEL }}
+          BLADE_REVIEW_BASE_URL: ${{ vars.BLADE_REVIEW_BASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REVIEW_INTENT: ${{ github.event.pull_request.title }}
+        run: |
+          set +e
+          node --import tsx src/cli/ci.ts \
+            --graph tmp/ui-cases/sample-graph.json \
+            --diff "$RUNNER_TEMP/blade-review.patch" \
+            --intent "$REVIEW_INTENT" \
+            --skip-reviewer-request 2>&1 | tee "$RUNNER_TEMP/blade-review.log"
+          REVIEW_STATUS=${PIPESTATUS[0]}
+          set -e
+
+          {
+            echo "## Blade architecture review"
+            echo
+            if [ "$REVIEW_STATUS" -eq 1 ]; then
+              echo "**Result:** Changes required"
+            else
+              echo "**Result:** Review completed"
+            fi
+            echo
+            echo "See the pull request review for findings and suggested changes."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit "$REVIEW_STATUS"
+
+      # Fork pull requests receive a read-only token. They still run the exact
+      # review and expose the result in the Actions step summary without trying
+      # to mutate the PR.
+      - name: Run architecture review (read-only)
+        if: github.event.pull_request.head.repo.full_name != github.repository
+        env:
+          REVIEW_INTENT: ${{ github.event.pull_request.title }}
+        run: |
+          set +e
+          node --import tsx src/cli/ci.ts \
+            --graph tmp/ui-cases/sample-graph.json \
+            --diff "$RUNNER_TEMP/blade-review.patch" \
+            --intent "$REVIEW_INTENT" \
+            --skip-reviewer-request \
+            --dry-run 2>&1 | tee "$RUNNER_TEMP/blade-review.log"
+          REVIEW_STATUS=${PIPESTATUS[0]}
+          set -e
+
+          {
+            echo "## Blade architecture review"
+            echo
+            echo "This pull request is read-only, so the review could not be posted."
+            echo
+            echo '```text'
+            sed -n '1,220p' "$RUNNER_TEMP/blade-review.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit "$REVIEW_STATUS"

@@ -116,17 +116,42 @@ product; the form factor is a delivery detail.
   and less demoralising than rejecting it at review time.
 - **CI** — `.github/workflows/ds-review.yml`. Verdicts post as PR reviews; fixes post as
   GitHub `suggestion` blocks so a designer applies the correct implementation in one click.
-  A completed check run records `success`, `failure`, or `neutral`; deferrals also request the
-  design-systems team and never look like a broken build.
+  The `Architecture review` job reports whether the workflow ran successfully, while the
+  `Blade architecture verdict` check records `success`, `failure`, or `neutral`. Deferrals also
+  request the design-systems team and never look like a broken build.
 
-### Repository-local UI demo
+### Sample pull request workflow
 
 `tmp/ui-cases/` contains a clean active component, six component scenarios,
-three rendered-snapshot fixtures, and a small committed demo graph. Copy a
-catalog case over the active component and open a PR; the self-contained
-`.github/workflows/ui-demo-review.yml` workflow runs this repository's agent,
-posts a real review for same-repository branches, and falls back to an Actions
-summary for forks. See `tmp/ui-cases/README.md` for the walkthrough.
+three rendered-snapshot fixtures, and a small committed sample graph. Copy a
+catalog case over the active component and open a sample PR; the self-contained
+`.github/workflows/sample-pr-review.yml` workflow runs the review, posts results
+for same-repository branches, and writes a read-only Actions summary for forks.
+See `tmp/ui-cases/README.md` for the walkthrough.
+
+### GitHub Actions configuration
+
+Local `.env` files are not available to GitHub-hosted runners. Add credentials
+under **Repository settings → Secrets and variables → Actions**:
+
+- Add either `OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY` as a repository secret.
+- Add `BLADE_REVIEW_PROVIDER` as a repository variable with `openrouter` or
+  `anthropic`.
+- Add `BLADE_REVIEW_MODEL` as a repository variable with the provider's model ID.
+- Add `BLADE_REVIEW_BASE_URL` only when using a custom OpenAI-compatible endpoint.
+
+The equivalent GitHub CLI setup is:
+
+```bash
+gh secret set OPENROUTER_API_KEY
+gh variable set BLADE_REVIEW_PROVIDER --body openrouter
+gh variable set BLADE_REVIEW_MODEL --body openai/gpt-4o-mini
+```
+
+`gh secret set` prompts for the value, so the key does not need to appear in
+shell history. Never commit the key or copy `.env.local` into the workflow.
+Without a configured key, the review still runs using deterministic checks.
+Secrets are not passed to workflows triggered from fork pull requests.
 
 ## Measurement
 

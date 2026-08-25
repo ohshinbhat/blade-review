@@ -1,8 +1,8 @@
-# UI review demo cases
+# Sample UI review cases
 
-This directory makes the review agent demonstrable inside its own repository.
-Only changes under `active/` trigger the demo PR workflow; `catalog/` contains
-copyable scenarios and never runs by itself.
+This directory provides a self-contained pull request sample. Only changes
+under `active/` trigger the sample workflow; `catalog/` contains copyable
+scenarios and never runs by itself.
 
 ## Component scenarios
 
@@ -45,27 +45,27 @@ to matching `DemoUI.web.test.tsx.snap` and `DemoUI.native.test.tsx.snap` names.
 After changing an active case:
 
 ```bash
-git diff --unified=80 -- tmp/ui-cases/active > /tmp/blade-ui-demo.patch
+git diff --unified=80 -- tmp/ui-cases/active > /tmp/blade-review.patch
 
 BLADE_REVIEW_PROVIDER=offline node --import tsx src/cli/ci.ts \
-  --graph tmp/ui-cases/demo-graph.json \
-  --diff /tmp/blade-ui-demo.patch \
-  --intent "Demo semantic UI structure review" \
+  --graph tmp/ui-cases/sample-graph.json \
+  --diff /tmp/blade-review.patch \
+  --intent "Review semantic UI structure" \
   --dry-run
 ```
 
-The demo graph is intentionally small and deterministic. Production Blade PRs
+The sample graph is intentionally small and deterministic. Production Blade PRs
 must continue using graphs extracted from the real base and head commits.
 
-## Pull-request CI demo
+## Sample pull-request CI
 
-The repository-local workflow is `.github/workflows/ui-demo-review.yml`. It
+The repository-local workflow is `.github/workflows/sample-pr-review.yml`. It
 runs only when a pull request changes `tmp/ui-cases/active/**`:
 
 - A branch in this repository receives a real PR review and check run.
 - A fork receives the same analysis in the Actions step summary because its
   token is read-only.
-- Offline mode makes the demonstration deterministic and requires no secrets.
+- Without an API key, deterministic checks still run locally and in CI.
 - Advisory structure findings are neutral; proven blockers fail the job.
 
 The existing `.github/workflows/ds-review.yml` remains the production template
