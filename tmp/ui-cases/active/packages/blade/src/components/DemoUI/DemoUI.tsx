@@ -6,6 +6,6 @@ export const DemoUI = (): React.ReactElement => (
   <Box>
     <Typography>Payment total</Typography>
     <Typography>₹500</Typography>
-    <Button variant="primary">Pay now</Button>
+    <Button variant="tertiary">Pay now</Button>
   </Box>
 );
