@@ -24,10 +24,17 @@ import { RULEBOOK } from '../knowledge/rulebook.js';
 import { toGitHubReview } from '../ci/github.js';
 import { extractJsxFromDiff, contiguousAddedBlocks } from '../extract/jsx.js';
 import { parseSnapshotDiff } from '../extract/snapshot.js';
+import { SYSTEM_PROMPT } from '../engine/prompt.js';
 
 const GRAPH = loadGraph(path.resolve('data/blade-graph.json'));
 const RULE_IDS = new Set(RULEBOOK.map((r) => r.id));
 const COMPONENTS = new Set(GRAPH.allComponentNames());
+
+test('review prompt excludes content and valid enum strings from token rules', () => {
+  assert.match(SYSTEM_PROMPT, /user-facing text/);
+  assert.match(SYSTEM_PROMPT, /valid string-union prop values/);
+  assert.match(SYSTEM_PROMPT, /content-only change.*architecturally correct/);
+});
 
 /** A provider that returns whatever we tell it to, so routing can be tested in isolation. */
 function stubProvider(judgment: ModelJudgment): LlmProvider {
@@ -155,6 +162,31 @@ describe('provider compatibility', () => {
       restoreEnv('OPENROUTER_API_KEY', previous.openrouter);
       restoreEnv('BLADE_REVIEW_PROVIDER', previous.provider);
       restoreEnv('BLADE_REVIEW_MODEL', previous.model);
+    }
+  });
+
+  test('uses provider defaults when unset Actions variables arrive as empty strings', () => {
+    const previous = {
+      anthropic: process.env.ANTHROPIC_API_KEY,
+      openrouter: process.env.OPENROUTER_API_KEY,
+      provider: process.env.BLADE_REVIEW_PROVIDER,
+      model: process.env.BLADE_REVIEW_MODEL,
+      baseUrl: process.env.BLADE_REVIEW_BASE_URL,
+    };
+    try {
+      delete process.env.ANTHROPIC_API_KEY;
+      process.env.OPENROUTER_API_KEY = 'test-key';
+      process.env.BLADE_REVIEW_PROVIDER = '';
+      process.env.BLADE_REVIEW_MODEL = '';
+      process.env.BLADE_REVIEW_BASE_URL = '';
+      const provider = createProvider(GRAPH, {});
+      assert.equal(provider.name, 'openrouter:openai/gpt-4o-mini');
+    } finally {
+      restoreEnv('ANTHROPIC_API_KEY', previous.anthropic);
+      restoreEnv('OPENROUTER_API_KEY', previous.openrouter);
+      restoreEnv('BLADE_REVIEW_PROVIDER', previous.provider);
+      restoreEnv('BLADE_REVIEW_MODEL', previous.model);
+      restoreEnv('BLADE_REVIEW_BASE_URL', previous.baseUrl);
     }
   });
 });
@@ -383,6 +415,32 @@ describe('verdict routing', () => {
     assert.equal(v.status, 'correct');
   });
 
+  test('a model cannot reject a TSX content-only change as a token violation', async () => {
+    const diff = [
+      'diff --git a/packages/blade/src/components/Card/Title.tsx b/packages/blade/src/components/Card/Title.tsx',
+      '--- a/packages/blade/src/components/Card/Title.tsx',
+      '+++ b/packages/blade/src/components/Card/Title.tsx',
+      '@@ -1 +1 @@',
+      '-<Typography>Payment total</Typography>',
+      '+<Typography>Order total</Typography>',
+    ].join('\n');
+    const v = await review({ intent: 'Update the title copy', diff }, GRAPH, {
+      provider: stubProvider({
+        status: 'incorrect',
+        confidence: 0.9,
+        summary: 'Copy must use a token',
+        reasoning: 'Incorrectly treated content as a visual token.',
+        rulesCited: ['ENC-001'],
+        affectedComponents: [],
+        suggestedApproach: '<Typography>{tokens.orderTotal}</Typography>',
+      }),
+    });
+    assert.equal(v.status, 'correct');
+    assert.equal(v.decidedBy, 'routing');
+    assert.deepEqual(v.rulesCited, []);
+    assert.equal(v.findings.length, 0);
+  });
+
   test('a provider failure degrades to needs_human and never to correct', async () => {
     const v = await review({ intent: 'some change to Card' }, GRAPH, {
       provider: {
@@ -415,8 +473,8 @@ describe('github adapter', () => {
     assert.ok(gh.requestReviewers.length > 0, 'a deferral should request the DS team');
   });
 
-  test('repository-local demos can disable reviewer assignment without changing neutrality', async () => {
-    const v = await review({ intent: 'ambiguous demo UI' }, GRAPH, {
+  test('repository-local samples can disable reviewer assignment without changing neutrality', async () => {
+    const v = await review({ intent: 'ambiguous sample UI' }, GRAPH, {
       provider: stubProvider({
         status: 'needs_human',
         confidence: 0.4,
@@ -429,7 +487,8 @@ describe('github adapter', () => {
     const gh = toGitHubReview(v, 'razorpay/design-system', false);
     assert.equal(gh.conclusion, 'neutral');
     assert.deepEqual(gh.requestReviewers, []);
-    assert.match(gh.body, /Reviewer assignment is disabled/);
+    assert.match(gh.body, /Automatic reviewer assignment is disabled/);
+    assert.equal(gh.checkTitle, 'Human architecture review required');
   });
 
   test('a blocking verdict requests changes and carries a suggestion block', async () => {

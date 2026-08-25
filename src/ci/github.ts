@@ -18,6 +18,8 @@ import type { Verdict } from '../types.js';
 
 export interface GitHubReview {
   event: 'REQUEST_CHANGES' | 'COMMENT' | 'APPROVE';
+  /** Plain-text title for the dedicated verdict check run. */
+  checkTitle: string;
   body: string;
   /** Inline comments, anchored to a file where the finding carries one. */
   comments: { path: string; line: number; side: 'RIGHT'; body: string }[];
@@ -29,10 +31,16 @@ export interface GitHubReview {
 
 const HEADER = '<!-- blade-ds-review -->';
 
-const TITLE: Record<Verdict['status'], string> = {
-  correct: '### ✅ Architecture check passed',
-  incorrect: '### ❌ Architecture check: changes needed',
-  needs_human: '### 🔍 Architecture check: design systems review requested',
+const REVIEW_TITLE: Record<Verdict['status'], string> = {
+  correct: '## Blade architecture review: passed',
+  incorrect: '## Blade architecture review: changes requested',
+  needs_human: '## Blade architecture review: human review needed',
+};
+
+const CHECK_TITLE: Record<Verdict['status'], string> = {
+  correct: 'Architecture review passed',
+  incorrect: 'Architecture changes required',
+  needs_human: 'Human architecture review required',
 };
 
 export function toGitHubReview(
@@ -40,7 +48,7 @@ export function toGitHubReview(
   dsTeam = 'razorpay/design-system',
   requestHumanReview = true,
 ): GitHubReview {
-  const body: string[] = [HEADER, TITLE[v.status], '', v.summary, ''];
+  const body: string[] = [HEADER, REVIEW_TITLE[v.status], '', v.summary, ''];
 
   if (v.status === 'correct') {
     body.push(
@@ -54,7 +62,7 @@ export function toGitHubReview(
   const judged = v.findings.filter((f) => f.provenance === 'MODEL');
 
   if (proven.length) {
-    body.push('#### Proven by static analysis', '');
+    body.push('### Verified findings', '');
     for (const f of proven) {
       const icon = f.severity === 'blocker' ? '🔴' : f.severity === 'warning' ? '🟡' : 'ℹ️';
       body.push(`${icon} **${f.ruleId}** — ${f.message}`);
@@ -64,7 +72,7 @@ export function toGitHubReview(
   }
 
   if (judged.length) {
-    body.push('#### Architectural judgment', '');
+    body.push('### Model-assisted findings', '');
     for (const f of judged) {
       body.push(`🟡 **${f.ruleId}** — ${f.message}`);
       body.push(`> ${f.evidence[0] ?? ''}`);
@@ -74,8 +82,8 @@ export function toGitHubReview(
 
   const realCascade = v.cascade.filter((c) => c.affectedComponents.length > 1);
   if (realCascade.length) {
-    body.push('#### Cascade impact', '');
-    body.push('<details><summary>Computed from the AST — every consumer, not a sample</summary>', '');
+    body.push('### Affected components', '');
+    body.push('<details><summary>Show the components identified from the AST</summary>', '');
     for (const c of realCascade.slice(0, 8)) {
       body.push(
         `- \`${c.tokenPath}\` → **${c.affectedComponents.length}** components: ${c.affectedComponents.join(', ')}`,
@@ -85,7 +93,7 @@ export function toGitHubReview(
   }
 
   if (v.suggestedApproach) {
-    body.push('#### Correct approach', '', '```tsx', v.suggestedApproach, '```', '');
+    body.push('### Suggested implementation', '', '```tsx', v.suggestedApproach, '```', '');
   }
 
   if (v.status === 'needs_human') {
@@ -93,8 +101,8 @@ export function toGitHubReview(
       `---`,
       '',
       requestHumanReview
-        ? `This one needs a human. ${v.confidence < 0.5 ? 'The agent could not reach a confident conclusion' : 'The agent is below the confidence threshold for an automatic verdict'}, so it is not blocking the PR — @${dsTeam} has been asked to take a look, and the analysis above is a starting point.`
-        : `This one needs a human. ${v.confidence < 0.5 ? 'The agent could not reach a confident conclusion' : 'The agent is below the confidence threshold for an automatic verdict'}, so it is not blocking the PR. Reviewer assignment is disabled for this repository-local demo; the analysis above is the handoff.`,
+        ? `The automated review could not reach a safe conclusion. This pull request is not blocked; @${dsTeam} has been asked to review the findings above.`
+        : 'The automated review could not reach a safe conclusion. This pull request is not blocked. Automatic reviewer assignment is disabled, so a maintainer should review the findings above.',
       '',
     );
   }
@@ -103,9 +111,9 @@ export function toGitHubReview(
     body.push(
       '---',
       '',
-      `_Rules cited: ${v.rulesCited.map((r) => `\`${r}\``).join(', ') || 'none'}. Checked against blade@\`${v.meta.bladeRef}\`._`,
+      `_Review context: Blade \`${v.meta.bladeRef}\` · Rules: ${v.rulesCited.map((r) => `\`${r}\``).join(', ') || 'none'}._`,
       '',
-      '_Disagree? Reply `/ds-agent disagree <reason>`. Your override is recorded as an eval case and reviewed when the rulebook is next updated._',
+      '_If this finding is incorrect, comment `/ds-agent disagree <reason>`. The override will be recorded for rule evaluation._',
     );
   }
 
@@ -129,6 +137,7 @@ export function toGitHubReview(
 
   return {
     event: v.status === 'incorrect' ? 'REQUEST_CHANGES' : 'COMMENT',
+    checkTitle: CHECK_TITLE[v.status],
     body: body.join('\n'),
     comments,
     requestReviewers: v.status === 'needs_human' && requestHumanReview ? [dsTeam] : [],

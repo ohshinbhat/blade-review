@@ -40,6 +40,32 @@ export interface ReviewOptions {
  */
 const DEFAULT_APPROVE_THRESHOLD = 0.75;
 
+/**
+ * True when a TSX diff preserves every tag and prop and changes only text
+ * between tags. Comments are ignored because they do not affect architecture.
+ */
+function isContentOnlyTsxChange(model: ReturnType<typeof buildChangeModel>): boolean {
+  const changed = model.files.filter((file) => file.added.length || file.removed.length);
+  if (!changed.length || changed.some((file) => !file.path.endsWith('.tsx'))) return false;
+
+  const normalize = (lines: string[]): string[] => lines
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('//') && !line.startsWith('/*') && !line.startsWith('*'))
+    .map((line) => line.replace(/>([^<]*)</g, '><'))
+    .sort();
+
+  let sawContentChange = false;
+  for (const file of changed) {
+    const added = normalize(file.added);
+    const removed = normalize(file.removed);
+    if (added.length !== removed.length || added.some((line, index) => line !== removed[index])) return false;
+    if (file.added.some((line) => />[^<]+</.test(line)) || file.removed.some((line) => />[^<]+</.test(line))) {
+      sawContentChange = true;
+    }
+  }
+  return sawContentChange;
+}
+
 export function createProvider(
   graph: BladeGraph,
   bundleRef: { current?: ContextBundle },
@@ -64,8 +90,8 @@ export function createProvider(
 
     return new OpenAICompatibleProvider({
       apiKey,
-      model: process.env.BLADE_REVIEW_MODEL ?? 'openai/gpt-4o-mini',
-      baseUrl: process.env.BLADE_REVIEW_BASE_URL ?? 'https://openrouter.ai/api/v1',
+      model: process.env.BLADE_REVIEW_MODEL || 'openai/gpt-4o-mini',
+      baseUrl: process.env.BLADE_REVIEW_BASE_URL || 'https://openrouter.ai/api/v1',
       providerName: 'openrouter',
       headers,
       knownRuleIds,
@@ -106,6 +132,7 @@ export async function review(
     model.proposesNewComponent = true;
   }
   const deterministicFindings = runDeterministicChecks(model, graph, priorGraph);
+  const contentOnlyTsxChange = isContentOnlyTsxChange(model);
 
   // ---- Retrieval ---------------------------------------------------------
   const bundle = buildContext(model, graph, deterministicFindings, priorGraph);
@@ -173,9 +200,22 @@ export async function review(
       suggestedApproach = judgment.suggestedApproach;
       decidedBy = 'model';
 
+      // Text content is outside token, reuse, and cascade architecture. A model
+      // cannot turn an unchanged JSX structure into a blocking architecture
+      // finding by treating copy as a design token or invented localization API.
+      if (status === 'incorrect' && !blockers.length && contentOnlyTsxChange) {
+        status = 'correct';
+        confidence = 1;
+        summary = 'Content changed without altering the Blade component architecture.';
+        reasoning = 'The JSX tags, props, and composition are unchanged; only user-facing text changed.';
+        rulesCited = [];
+        suggestedApproach = undefined;
+        decidedBy = 'routing';
+      }
+
       // The model's non-deterministic findings are recorded as MODEL provenance so
       // a reader can always tell which half of the verdict is proven.
-      if (judgment.status === 'incorrect' && !blockers.length) {
+      if (status === 'incorrect' && !blockers.length) {
         findings.push({
           ruleId: judgment.rulesCited[0] ?? 'JUDGMENT',
           category: inferCategory(judgment.rulesCited),
