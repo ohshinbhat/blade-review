@@ -14,7 +14,7 @@ import * as fs from 'fs';
 import type { ComponentNode, PropDefinition, TokenUsageEdge, TokenNode } from '../types.js';
 import { parseFile, walkObjectLiteral, isTokenPathLike } from './tokens.js';
 
-const SKIP_DIR = /(__tests__|__snapshots__|stories|docs)/;
+const SKIP_DIR = /(__tests__|stories|docs)/;
 
 function lineOf(sf: ts.SourceFile, node: ts.Node): number {
   return sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;

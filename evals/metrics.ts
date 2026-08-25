@@ -65,7 +65,7 @@ export function computeMetrics(results: CaseResult[]): Metrics {
     : null;
 
   const byCategory: Metrics['byCategory'] = {};
-  for (const cat of ['encoding', 'cascading', 'reuse', 'composition', 'render'] as CheckCategory[]) {
+  for (const cat of ['encoding', 'cascading', 'reuse', 'composition'] as CheckCategory[]) {
     const subset = results.filter((r) => r.case.category === cat);
     if (!subset.length) continue;
     byCategory[cat] = {

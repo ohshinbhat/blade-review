@@ -15,7 +15,6 @@ import type { BladeGraph } from '../extract/graph.js';
 import type { ChangeModel } from './changeModel.js';
 import { rule } from '../knowledge/rulebook.js';
 import { COMPOSITION_CHECKS } from './composition.js';
-import { RENDER_CHECKS } from './render.js';
 import { STRUCTURE_CHECKS } from './structure.js';
 
 type Check = (m: ChangeModel, g: BladeGraph, prior: BladeGraph) => Finding[];
@@ -482,7 +481,6 @@ const CHECKS: Check[] = [
   checkTokenFileLocation,
   ...COMPOSITION_CHECKS,
   ...STRUCTURE_CHECKS,
-  ...RENDER_CHECKS,
 ];
 
 export function runDeterministicChecks(m: ChangeModel, g: BladeGraph, prior: BladeGraph = g): Finding[] {

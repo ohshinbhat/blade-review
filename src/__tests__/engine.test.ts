@@ -23,7 +23,6 @@ import { buildContext } from '../knowledge/retrieval.js';
 import { RULEBOOK } from '../knowledge/rulebook.js';
 import { toGitHubReview } from '../ci/github.js';
 import { extractJsxFromDiff, contiguousAddedBlocks } from '../extract/jsx.js';
-import { parseSnapshotDiff } from '../extract/snapshot.js';
 import { SYSTEM_PROMPT } from '../engine/prompt.js';
 
 const GRAPH = loadGraph(path.resolve('data/blade-graph.json'));
@@ -645,122 +644,6 @@ describe('composition checks (COMP-*)', () => {
     const diff = diffFor('packages/blade/src/components/Card/Preview.tsx', ['<Card.Header title="x" />']);
     const model = buildChangeModel({ intent: 'add a card header', diff }, GRAPH);
     const findings = runDeterministicChecks(model, GRAPH).filter((f) => f.ruleId === 'COMP-005');
-    assert.equal(findings.length, 0);
-  });
-});
-
-describe('snapshot diff parsing and render checks (REND-*)', () => {
-  test('parses a story header and its declarations from added lines only', () => {
-    const parsed = parseSnapshotDiff({
-      path: 'packages/blade/src/components/Card/__tests__/__snapshots__/Card.web.test.tsx.snap',
-      added: ['exports[`Card renders correctly 1`] = `', '  padding: 16px;', '  color: #0a8000;', '`;'],
-      addedLineNumbers: [1, 2, 3, 4],
-    });
-    assert.ok(parsed);
-    assert.equal(parsed!.platform, 'web');
-    assert.equal(parsed!.component, 'Card');
-    assert.equal(parsed!.stories.length, 1);
-    assert.equal(parsed!.stories[0].story, 'Card renders correctly 1');
-    assert.equal(parsed!.stories[0].declarations.length, 2);
-    assert.deepEqual(parsed!.stories[0].declarations[0], { property: 'padding', rawValue: '16px', numeric: 16, unit: 'px', line: 2 });
-  });
-
-  test('REND-001 flags a resolved px value that matches no token', () => {
-    const file = 'packages/blade/src/components/Card/__tests__/__snapshots__/Card.web.test.tsx.snap';
-    const diff = [
-      `diff --git a/${file} b/${file}`,
-      `--- a/${file}`,
-      `+++ b/${file}`,
-      '@@ -1,1 +1,4 @@',
-      '+exports[`Card renders correctly 1`] = `',
-      '+  padding: 9px;', // 9 is off Blade's real spacing/size scale; 15 collides with size.15
-      '+`;',
-    ].join('\n');
-    const model = buildChangeModel({ intent: 'tighten the padding', diff }, GRAPH);
-    const findings = runDeterministicChecks(model, GRAPH).filter((f) => f.ruleId === 'REND-001');
-    assert.equal(findings.length, 1);
-    assert.equal(findings[0].severity, 'blocker');
-  });
-
-  test('REND-001 does not flag a value already on the token scale', () => {
-    const file = 'packages/blade/src/components/Card/__tests__/__snapshots__/Card.web.test.tsx.snap';
-    const diff = [
-      `diff --git a/${file} b/${file}`,
-      `--- a/${file}`,
-      `+++ b/${file}`,
-      '@@ -1,1 +1,4 @@',
-      '+exports[`Card renders correctly 1`] = `',
-      '+  padding: 16px;',
-      '+`;',
-    ].join('\n');
-    const model = buildChangeModel({ intent: 'tighten the padding', diff }, GRAPH);
-    const findings = runDeterministicChecks(model, GRAPH).filter((f) => f.ruleId === 'REND-001');
-    assert.equal(findings.length, 0);
-  });
-
-  test('REND-002 flags web/native resolving the same story to different values', () => {
-    const web = 'packages/blade/src/components/Card/__tests__/__snapshots__/Card.web.test.tsx.snap';
-    const native = 'packages/blade/src/components/Card/__tests__/__snapshots__/Card.native.test.tsx.snap';
-    const diff = [
-      `diff --git a/${web} b/${web}`,
-      `--- a/${web}`,
-      `+++ b/${web}`,
-      '@@ -1,1 +1,4 @@',
-      '+exports[`Card renders correctly 1`] = `',
-      '+  padding: 8px;',
-      '+`;',
-      `diff --git a/${native} b/${native}`,
-      `--- a/${native}`,
-      `+++ b/${native}`,
-      '@@ -1,1 +1,4 @@',
-      '+exports[`Card renders correctly 1`] = `',
-      '+  padding: 12px;',
-      '+`;',
-    ].join('\n');
-    const model = buildChangeModel({ intent: 'update padding on both platforms', diff }, GRAPH);
-    const findings = runDeterministicChecks(model, GRAPH).filter((f) => f.ruleId === 'REND-002');
-    assert.equal(findings.length, 1);
-    assert.match(findings[0].message, /8px/);
-    assert.match(findings[0].message, /12px/);
-  });
-
-  test('REND-002 does not flag matching web/native values', () => {
-    const web = 'packages/blade/src/components/Card/__tests__/__snapshots__/Card.web.test.tsx.snap';
-    const native = 'packages/blade/src/components/Card/__tests__/__snapshots__/Card.native.test.tsx.snap';
-    const diff = [
-      `diff --git a/${web} b/${web}`,
-      `--- a/${web}`,
-      `+++ b/${web}`,
-      '@@ -1,1 +1,4 @@',
-      '+exports[`Card renders correctly 1`] = `',
-      '+  padding: 16px;',
-      '+`;',
-      `diff --git a/${native} b/${native}`,
-      `--- a/${native}`,
-      `+++ b/${native}`,
-      '@@ -1,1 +1,4 @@',
-      '+exports[`Card renders correctly 1`] = `',
-      '+  padding: 16px;',
-      '+`;',
-    ].join('\n');
-    const model = buildChangeModel({ intent: 'update padding on both platforms', diff }, GRAPH);
-    const findings = runDeterministicChecks(model, GRAPH).filter((f) => f.ruleId === 'REND-002');
-    assert.equal(findings.length, 0);
-  });
-
-  test('REND-002 does not compare across platforms when only one side changed in this diff', () => {
-    const web = 'packages/blade/src/components/Card/__tests__/__snapshots__/Card.web.test.tsx.snap';
-    const diff = [
-      `diff --git a/${web} b/${web}`,
-      `--- a/${web}`,
-      `+++ b/${web}`,
-      '@@ -1,1 +1,4 @@',
-      '+exports[`Card renders correctly 1`] = `',
-      '+  padding: 16px;',
-      '+`;',
-    ].join('\n');
-    const model = buildChangeModel({ intent: 'update web padding only', diff }, GRAPH);
-    const findings = runDeterministicChecks(model, GRAPH).filter((f) => f.ruleId === 'REND-002');
     assert.equal(findings.length, 0);
   });
 });

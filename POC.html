@@ -176,6 +176,7 @@
     .section-head > p:last-child { color: var(--muted); font-size: 17px; }
 
     .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .check-grid { grid-template-columns: repeat(4, 1fr); }
     .step {
       padding: 26px;
       border: 1px solid var(--line);
@@ -376,7 +377,7 @@
     @media (max-width: 800px) {
       nav { display: none; }
       .hero { grid-template-columns: 1fr; gap: 52px; padding: 68px 0 76px; }
-      .steps, .demo-grid, .principles, .run-card, .split, .rule-groups, .flow { grid-template-columns: 1fr; }
+      .steps, .check-grid, .demo-grid, .principles, .run-card, .split, .rule-groups, .flow { grid-template-columns: 1fr; }
       .pipeline { grid-template-columns: 1fr 1fr; }
       .layer-card::after { display: none; }
       .metrics { grid-template-columns: 1fr 1fr; }
@@ -474,7 +475,7 @@
         <p>The pipeline separates facts from judgment. Each layer has one job, and later layers cannot erase evidence produced earlier.</p>
       </div>
       <div class="pipeline">
-        <article class="layer-card"><span class="layer-id">L0</span><h3>Extract</h3><p>Parse Blade source, diff-added JSX, and changed snapshots into typed facts.</p></article>
+        <article class="layer-card"><span class="layer-id">L0</span><h3>Extract</h3><p>Parse Blade source and diff-added TSX into typed component, prop, token, and JSX facts.</p></article>
         <article class="layer-card"><span class="layer-id">L1A</span><h3>Prove</h3><p>Run exact checks for literals, duplicates, variants, naming, parity, and cascade.</p></article>
         <article class="layer-card"><span class="layer-id">L1B</span><h3>Structure</h3><p>Turn an added JSX subtree into an evidence-backed plan using existing Blade components.</p></article>
         <article class="layer-card"><span class="layer-id">L2</span><h3>Judge</h3><p>Send only unresolved questions and relevant context to one model call.</p></article>
@@ -563,16 +564,15 @@
 
     <section id="checks">
       <div class="section-head">
-        <p class="eyebrow">The five checks</p>
+        <p class="eyebrow">The four checks</p>
         <h2>Small set, high leverage.</h2>
         <p>The POC focuses on architectural mistakes that are costly to discover late and concrete enough to verify.</p>
       </div>
-      <div class="steps">
+      <div class="steps check-grid">
         <article class="step"><span class="step-number">Encoding</span><h3>Is it represented correctly?</h3><p>Find hard-coded colours and dimensions, invalid token names, misplaced component tokens, and switch-based variant styling.</p></article>
         <article class="step"><span class="step-number">Cascading</span><h3>What else will change?</h3><p>Trace shared tokens and base components to every consumer. Pair web and native changes by component and matching file surface.</p></article>
         <article class="step"><span class="step-number">Reuse</span><h3>Does Blade already have it?</h3><p>Match against base-commit tokens and variant axes. For a new component, compare its extracted prop surface with existing components.</p></article>
         <article class="step"><span class="step-number">Composition</span><h3>Can existing components build it?</h3><p>Read the added JSX tree, map raw containers, text, controls, lists, and tables to verified Blade primitives, and report uncovered elements.</p></article>
-        <article class="step"><span class="step-number">Render</span><h3>What does it resolve to?</h3><p>Inspect changed snapshots for off-scale values and paired web/native output that resolves differently.</p></article>
       </div>
       <div class="info-card" style="margin-top:20px">
         <h3>Structure reuse, without visual guessing</h3>
@@ -618,10 +618,6 @@
           <li><code>COMP-004</code><span>No illegal interactive nesting</span></li>
           <li><code>COMP-005</code><span>Use declared variant values</span></li>
         </ul></article>
-        <article class="rule-group"><h3>Correct render output</h3><ul class="rule-list">
-          <li><code>REND-001</code><span>Rendered values stay on scale</span></li>
-          <li><code>REND-002</code><span>Web/native output stays aligned</span></li>
-        </ul></article>
       </div>
     </section>
 
@@ -665,11 +661,11 @@
         <p>The eval suite compares the deterministic floor with the full judgment layer. False approvals lead because they are the most expensive failure.</p>
       </div>
       <div class="metrics">
-        <div class="metric"><span class="metric-label">False approve</span><strong>0.0%</strong><span>0 of 53 reject cases</span></div>
-        <div class="metric"><span class="metric-label">False reject</span><strong>0.0%</strong><span>0 of 16 positive controls rejected</span></div>
-        <div class="metric"><span class="metric-label">Accuracy</span><strong>78.7%</strong><span>75 evaluated changes</span></div>
+        <div class="metric"><span class="metric-label">False approve</span><strong>0.0%</strong><span>0 of 47 reject cases</span></div>
+        <div class="metric"><span class="metric-label">False reject</span><strong>0.0%</strong><span>0 of 15 positive controls rejected</span></div>
+        <div class="metric"><span class="metric-label">Accuracy</span><strong>77.9%</strong><span>68 evaluated changes</span></div>
         <div class="metric"><span class="metric-label">Correct approvals</span><strong>0.0%</strong><span>all positive controls defer offline</span></div>
-        <div class="metric"><span class="metric-label">Decision coverage</span><strong>70.7%</strong><span>automatic yes/no at the offline floor</span></div>
+        <div class="metric"><span class="metric-label">Decision coverage</span><strong>69.1%</strong><span>automatic yes/no at the offline floor</span></div>
         <div class="metric"><span class="metric-label">Rule citation</span><strong>100%</strong><span>right reason, not just status</span></div>
         <div class="metric"><span class="metric-label">Cascade recall</span><strong>100%</strong><span>deterministic by construction</span></div>
       </div>
@@ -700,7 +696,7 @@
       </div>
       <ol class="timeline">
         <li><span class="index">01</span><div><strong>Extraction pipeline</strong><p>AST-based graph of tokens, components, prop unions, consumption edges, and docs.</p></div><span class="state">Done</span></li>
-        <li><span class="index">02</span><div><strong>Rulebook and deterministic checks</strong><p>Twenty-one sourced rules with exact checks for mechanically decidable cases.</p></div><span class="state">Done</span></li>
+        <li><span class="index">02</span><div><strong>Rulebook and deterministic checks</strong><p>Nineteen sourced rules with exact checks for mechanically decidable cases.</p></div><span class="state">Done</span></li>
         <li><span class="index">03</span><div><strong>Judgment and routing</strong><p>Structured output, grounding validation, provider interface, and safe three-way routing.</p></div><span class="state">Done</span></li>
         <li><span class="index">04</span><div><strong>CLI, GitHub adapter, and evals</strong><p>Intent review, diff review, CI comments, suggestions, and a two-arm harness.</p></div><span class="state">Done</span></li>
         <li><span class="index">05</span><div><strong>Provider flexibility</strong><p>Offline mode, Anthropic, and OpenRouter-compatible chat completion models.</p></div><span class="state">Done</span></li>
@@ -740,10 +736,10 @@
         <li><strong>Prose parsing is partly heuristic.</strong> Signals that are not backed by the graph cannot become proven blockers.</li>
         <li><strong>Cross-file prop types are not fully resolved.</strong> Local unions and intersections are handled, but imported types need a full checker program.</li>
         <li><strong>The model contribution is not measured in current results.</strong> Both saved eval arms ran with the offline provider.</li>
-        <li><strong>Positive controls defer offline.</strong> The offline floor never approves by design, so its current accuracy is 78.7% and correct-approval recall is reported separately as 0%.</li>
+        <li><strong>Positive controls defer offline.</strong> The offline floor never approves by design, so its current accuracy is 77.9% and correct-approval recall is reported separately as 0%.</li>
         <li><strong>The rulebook needs team ownership.</strong> It is sourced, but production deployment starts with Blade maintainers reviewing and editing it.</li>
         <li><strong>The graph must be refreshed.</strong> Intent review is only as current as its extracted Blade release; CI rebuilds against the PR.</li>
-        <li><strong>Rendered structure is semantic, not visual.</strong> It uses complete JSX blocks and changed snapshots, not screenshots; partial prop-only hunks and subjective visual fit still defer.</li>
+        <li><strong>TSX structure is semantic, not visual.</strong> It uses complete JSX blocks rather than screenshots; partial prop-only hunks and subjective visual fit still defer.</li>
       </ul>
     </section>
 

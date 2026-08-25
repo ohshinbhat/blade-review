@@ -22,23 +22,21 @@ cp tmp/ui-cases/catalog/02-raw-ui-reuse.tsx \
 | `04-nested-interactive.tsx` | Blocking `COMP-004` finding |
 | `05-invalid-variant.tsx` | Blocking `COMP-005` finding |
 | `06-partial-coverage.tsx` | Advisory reuse plan with `canvas` disclosed as unmapped |
+| `07-conditional-variant.tsx` | Blocking `ENC-002` conditional-variant finding |
+| `08-web-only-platform.tsx` | Blocking `CAS-004` when added as `DemoUI.web.tsx` without a native peer |
 
 Restore the clean case by copying `01-clean-composition.tsx` back to the active
 component.
 
-## Render scenarios
-
-For an off-scale resolved value, copy the catalog snapshot into the mirrored
-active component path:
+For the source-parity case, add the catalog file as a web-specific implementation:
 
 ```bash
-mkdir -p tmp/ui-cases/active/packages/blade/src/components/DemoUI/__tests__/__snapshots__
-cp tmp/ui-cases/catalog/07-off-scale-render.web.snap.txt \
-  tmp/ui-cases/active/packages/blade/src/components/DemoUI/__tests__/__snapshots__/DemoUI.web.test.tsx.snap
+cp tmp/ui-cases/catalog/08-web-only-platform.tsx \
+  tmp/ui-cases/active/packages/blade/src/components/DemoUI/DemoUI.web.tsx
 ```
 
-That produces `REND-001`. To demonstrate `REND-002`, copy both case `08` files
-to matching `DemoUI.web.test.tsx.snap` and `DemoUI.native.test.tsx.snap` names.
+That produces `CAS-004` because the component ships on web and native but the
+pull request adds only the web implementation.
 
 ## Local preview of the exact PR diff
 

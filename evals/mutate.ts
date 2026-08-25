@@ -19,9 +19,6 @@
  *   - inline style prop instead of styled props      -> COMP-002
  *   - nest one interactive element inside another    -> COMP-004
  *   - use a variant value never added to the union   -> COMP-005
- *   - a computed snapshot value off the token scale  -> REND-001
- *   - web/native snapshots resolve the same story
- *     to different values                            -> REND-002
  */
 import type { BladeGraph } from '../src/extract/graph.js';
 import type { EvalCase } from './types.js';
@@ -236,51 +233,7 @@ export function generateMutations(g: BladeGraph): EvalCase[] {
     rationale: "Button.variant only allows primary | secondary | tertiary. \"quaternary\" was never added to the union.",
   });
 
-  // ---- REND-001: an off-scale value in the rendered snapshot ---------------
-  const offScale = offScaleValue(g);
-  for (const { name } of componentsWithVariants.slice(0, 3)) {
-    cases.push({
-      id: `mut-rend001-${name}`,
-      origin: 'mutation',
-      category: 'render',
-      intent: `Tighten up the ${name} spacing slightly.`,
-      diff: diffFor(`packages/blade/src/components/${name}/__tests__/__snapshots__/${name}.web.test.tsx.snap`, [
-        `exports[\`${name} renders correctly 1\`] = \``,
-        `  padding: ${offScale}px;`,
-        '`;',
-      ]),
-      expected: { status: 'incorrect', rules: ['REND-001'] },
-      rationale: `${offScale}px matches no token in the scale. Read from the diffed snapshot's computed CSS, not from a literal the diff shows in source.`,
-    });
-  }
-
-  // ---- REND-002: web and native resolve the same story differently ---------
-  for (const { name } of componentsWithVariants.slice(0, 3)) {
-    const web = `packages/blade/src/components/${name}/__tests__/__snapshots__/${name}.web.test.tsx.snap`;
-    const native = `packages/blade/src/components/${name}/__tests__/__snapshots__/${name}.native.test.tsx.snap`;
-    cases.push({
-      id: `mut-rend002-${name}`,
-      origin: 'mutation',
-      category: 'render',
-      intent: `Update the ${name} padding on both platforms.`,
-      diff: [
-        diffFor(web, [`exports[\`${name} renders correctly 1\`] = \``, '  padding: 8px;', '`;']),
-        diffFor(native, [`exports[\`${name} renders correctly 1\`] = \``, '  padding: 12px;', '`;']),
-      ].join('\n'),
-      expected: { status: 'incorrect', rules: ['REND-002'] },
-      rationale: `${name} resolves padding to 8px on web and 12px on native for the same story — the two platforms no longer render the same thing.`,
-    });
-  }
-
   return cases;
-}
-
-/** A numeric value guaranteed not to match any extracted global token — for REND-001 cases. */
-function offScaleValue(g: BladeGraph): number {
-  for (let candidate = 15; candidate < 80; candidate++) {
-    if (!g.tokensWithValue(candidate).length) return candidate;
-  }
-  return 9999;
 }
 
 /**
@@ -345,24 +298,6 @@ export function generatePositiveControls(g: BladeGraph): EvalCase[] {
     expected: { status: 'correct' },
     rationale: 'Positive control: composed entirely from Box/Typography, no raw intrinsics, no inline style, no illegal nesting, no invalid variant literal.',
   });
-
-  // ---- Positive control: paired snapshots resolve to the same value --------
-  {
-    const web = 'packages/blade/src/components/Card/__tests__/__snapshots__/Card.web.test.tsx.snap';
-    const native = 'packages/blade/src/components/Card/__tests__/__snapshots__/Card.native.test.tsx.snap';
-    cases.push({
-      id: 'positive-render-cross-platform-match',
-      origin: 'mutation',
-      category: 'render',
-      intent: 'Update Card padding on both platforms to the same token-backed value.',
-      diff: [
-        diffFor(web, ['exports[`Card renders correctly 1`] = `', '  padding: 16px;', '`;']),
-        diffFor(native, ['exports[`Card renders correctly 1`] = `', '  padding: 16px;', '`;']),
-      ].join('\n'),
-      expected: { status: 'correct' },
-      rationale: 'Positive control: both platforms resolve padding to 16px (spacing.5) for the same story — on-scale and matching.',
-    });
-  }
 
   return cases;
 }

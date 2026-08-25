@@ -1,3 +1,0 @@
-exports[`DemoUI renders correctly 1`] = `
-  padding: 8px;
-`;
