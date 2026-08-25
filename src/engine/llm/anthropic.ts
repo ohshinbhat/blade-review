@@ -29,7 +29,7 @@ export class AnthropicProvider implements LlmProvider {
   constructor(opts: AnthropicOptions) {
     this.opts = {
       apiKey: opts.apiKey,
-      model: opts.model ?? process.env.BLADE_REVIEW_MODEL ?? 'claude-sonnet-4-5',
+      model: opts.model || process.env.BLADE_REVIEW_MODEL || 'claude-sonnet-4-5',
       maxTokens: opts.maxTokens ?? 2000,
       timeoutMs: opts.timeoutMs ?? 60_000,
       maxRetries: opts.maxRetries ?? 2,

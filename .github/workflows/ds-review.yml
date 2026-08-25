@@ -1,4 +1,4 @@
-name: Design System Architecture Review
+name: Blade Architecture Review
 
 # Runs on any PR that touches Blade's component or token surface. The check is
 # advisory-by-default: it fails only on a proven or judged violation, and a
@@ -22,43 +22,45 @@ concurrency:
 
 jobs:
   architecture-review:
+    name: Architecture review
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout Blade
+      - name: Checkout pull request
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Checkout Blade base commit
+      - name: Checkout base revision
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: .blade-base
 
-      - name: Checkout review agent
+      - name: Checkout Blade review agent
         uses: actions/checkout@v4
         with:
           repository: razorpay/blade-pr-review-agent
           path: .ds-agent
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install agent
+      - name: Install dependencies
         working-directory: .ds-agent
         run: npm ci
 
       # Head facts drive cascade/final-state checks; base facts drive prior-art
       # checks so code introduced by this PR is not mistaken for pre-existing code.
-      - name: Build knowledge graph
+      - name: Build architecture graph
         working-directory: .ds-agent
         run: |
           npx tsx src/cli/extract.ts --blade "$GITHUB_WORKSPACE" --out data/blade-graph.json
           npx tsx src/cli/extract.ts --blade "$GITHUB_WORKSPACE/.blade-base" --out data/blade-base-graph.json
 
-      - name: Review PR
+      - name: Run architecture review
         working-directory: .ds-agent
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -67,5 +69,8 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          BLADE_REVIEW_PROVIDER: ${{ vars.BLADE_REVIEW_PROVIDER }}
+          BLADE_REVIEW_MODEL: ${{ vars.BLADE_REVIEW_MODEL }}
+          BLADE_REVIEW_BASE_URL: ${{ vars.BLADE_REVIEW_BASE_URL }}
           # Without either key the agent still runs, at the deterministic floor.
         run: npx tsx src/cli/ci.ts --graph data/blade-graph.json --base-graph data/blade-base-graph.json --team razorpay/design-system

@@ -9,7 +9,7 @@
  *     npx tsx src/cli/ci.ts --graph data/blade-graph.json
  *
  * --dry-run prints the review payload instead of posting it, which is how the
- * demo runs without write access to a repo.
+ * local samples run without write access to a repository.
  */
 import * as fs from 'fs';
 import * as path from 'path';
@@ -79,11 +79,11 @@ async function postCheckRun(
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      name: 'Blade design-system architecture',
+      name: 'Blade architecture verdict',
       head_sha: sha,
       status: 'completed',
       conclusion: payload.conclusion,
-      output: { title: payload.body.split('\n')[1] ?? 'Blade architecture review', summary: payload.body.slice(0, 65_000) },
+      output: { title: payload.checkTitle, summary: payload.body.slice(0, 65_000) },
     }),
   });
   if (!res.ok) throw new Error(`GitHub check-run post failed: ${res.status} ${await res.text()}`);
@@ -120,6 +120,7 @@ async function main(): Promise<void> {
     process.stdout.write(
       [
         `event:      ${payload.event}`,
+        `verdict:    ${payload.checkTitle}`,
         `conclusion: ${payload.conclusion}`,
         `reviewers:  ${payload.requestReviewers.join(', ') || '-'}`,
         `inline:     ${payload.comments.length} suggestion block(s)`,
@@ -134,7 +135,7 @@ async function main(): Promise<void> {
     await postReview(repo, pr, token, payload);
     const headSha = process.env.PR_HEAD_SHA ?? process.env.GITHUB_SHA;
     if (headSha) await postCheckRun(repo, headSha, token, payload);
-    process.stdout.write(`Posted ${payload.event} to ${repo}#${pr}\n`);
+    process.stdout.write(`Posted architecture review to ${repo}#${pr}: ${payload.checkTitle}\n`);
   }
 
   // The gate blocks only on a proven-or-judged violation. needs_human never fails
