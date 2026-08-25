@@ -24,10 +24,17 @@ import { RULEBOOK } from '../knowledge/rulebook.js';
 import { toGitHubReview } from '../ci/github.js';
 import { extractJsxFromDiff, contiguousAddedBlocks } from '../extract/jsx.js';
 import { parseSnapshotDiff } from '../extract/snapshot.js';
+import { SYSTEM_PROMPT } from '../engine/prompt.js';
 
 const GRAPH = loadGraph(path.resolve('data/blade-graph.json'));
 const RULE_IDS = new Set(RULEBOOK.map((r) => r.id));
 const COMPONENTS = new Set(GRAPH.allComponentNames());
+
+test('review prompt excludes content and valid enum strings from token rules', () => {
+  assert.match(SYSTEM_PROMPT, /user-facing text/);
+  assert.match(SYSTEM_PROMPT, /valid string-union prop values/);
+  assert.match(SYSTEM_PROMPT, /content-only change.*architecturally correct/);
+});
 
 /** A provider that returns whatever we tell it to, so routing can be tested in isolation. */
 function stubProvider(judgment: ModelJudgment): LlmProvider {
