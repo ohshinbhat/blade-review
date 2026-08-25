@@ -18,9 +18,12 @@ import { RULEBOOK } from '../knowledge/rulebook.js';
 import { SYSTEM_PROMPT, buildUserMessage } from './prompt.js';
 import { OfflineProvider } from './llm/offline.js';
 import { AnthropicProvider } from './llm/anthropic.js';
+import { OpenAICompatibleProvider } from './llm/openaiCompatible.js';
 
 export interface ReviewOptions {
   provider?: LlmProvider;
+  /** Base-commit graph used for "did this already exist?" prior-art checks. */
+  priorGraph?: BladeGraph;
   /** Confidence below which a model verdict is routed to a human instead of enforced. */
   confidenceThreshold?: number;
   /** Skip the model entirely (deterministic floor only). */
@@ -41,13 +44,47 @@ export function createProvider(
   graph: BladeGraph,
   bundleRef: { current?: ContextBundle },
 ): LlmProvider {
+  const requested = process.env.BLADE_REVIEW_PROVIDER?.toLowerCase();
+  const knownRuleIds = new Set(RULEBOOK.map((r) => r.id));
+  const knownComponents = new Set(graph.allComponentNames());
+
+  if (requested === 'offline') return new OfflineProvider(bundleRef);
+
+  // Preserve the existing zero-config Anthropic behaviour when no provider is
+  // selected. OpenRouter is auto-selected when it is the only configured key.
+  const useOpenRouter =
+    requested === 'openrouter' || (!requested && !process.env.ANTHROPIC_API_KEY && !!process.env.OPENROUTER_API_KEY);
+  if (useOpenRouter) {
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) throw new Error('BLADE_REVIEW_PROVIDER=openrouter requires OPENROUTER_API_KEY.');
+
+    const headers: Record<string, string> = {};
+    if (process.env.OPENROUTER_SITE_URL) headers['HTTP-Referer'] = process.env.OPENROUTER_SITE_URL;
+    if (process.env.OPENROUTER_APP_NAME) headers['X-Title'] = process.env.OPENROUTER_APP_NAME;
+
+    return new OpenAICompatibleProvider({
+      apiKey,
+      model: process.env.BLADE_REVIEW_MODEL ?? 'openai/gpt-4o-mini',
+      baseUrl: process.env.BLADE_REVIEW_BASE_URL ?? 'https://openrouter.ai/api/v1',
+      providerName: 'openrouter',
+      headers,
+      knownRuleIds,
+      knownComponents,
+    });
+  }
+
+  if (requested && requested !== 'anthropic') {
+    throw new Error(`Unknown BLADE_REVIEW_PROVIDER ${JSON.stringify(requested)}. Use offline, anthropic, or openrouter.`);
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return new OfflineProvider(bundleRef);
-  return new AnthropicProvider({
-    apiKey,
-    knownRuleIds: new Set(RULEBOOK.map((r) => r.id)),
-    knownComponents: new Set(graph.allComponentNames()),
-  });
+  if (!apiKey) {
+    if (requested === 'anthropic') {
+      throw new Error('BLADE_REVIEW_PROVIDER=anthropic requires ANTHROPIC_API_KEY.');
+    }
+    return new OfflineProvider(bundleRef);
+  }
+  return new AnthropicProvider({ apiKey, knownRuleIds, knownComponents });
 }
 
 export async function review(
@@ -57,13 +94,21 @@ export async function review(
 ): Promise<Verdict> {
   const started = Date.now();
   const threshold = options.confidenceThreshold ?? DEFAULT_APPROVE_THRESHOLD;
+  const priorGraph = options.priorGraph ?? graph;
 
-  // ---- Layer 1: deterministic -------------------------------------------
+  // ---- Layer 1A/1B: deterministic facts + semantic UI structure ---------
   const model = buildChangeModel(change, graph);
-  const deterministicFindings = runDeterministicChecks(model, graph);
+  if (
+    model.targetComponents.some(
+      (name) => !priorGraph.component(name) && graph.component(name),
+    )
+  ) {
+    model.proposesNewComponent = true;
+  }
+  const deterministicFindings = runDeterministicChecks(model, graph, priorGraph);
 
   // ---- Retrieval ---------------------------------------------------------
-  const bundle = buildContext(model, graph, deterministicFindings);
+  const bundle = buildContext(model, graph, deterministicFindings, priorGraph);
   const bundleRef = { current: bundle };
   const provider = options.provider ?? createProvider(graph, bundleRef);
 
@@ -85,13 +130,35 @@ export async function review(
   let providerName = 'deterministic-only';
 
   if (options.deterministicOnly) {
-    status = blockers.length ? 'incorrect' : 'needs_human';
-    confidence = blockers.length ? 0.95 : 0.3;
-    summary = blockers.length
-      ? `${blockers.length} architectural rule violation(s).`
-      : 'No deterministic violation; judgment layer disabled.';
-    reasoning = blockers.map((f) => `${f.ruleId}: ${f.message}`).join('\n') || 'No mechanical violations found.';
-    rulesCited = [...new Set(blockers.map((f) => f.ruleId))];
+    // Mirrors OfflineProvider's three-way split (blocker / warning / nothing) —
+    // the same distinction had no observable effect before COMP-001 and the
+    // Typography-nesting half of COMP-004 introduced the first *standing*
+    // warning-severity findings (every other rule's warnings only ever appear
+    // via the prose-signal downgrade, which this deterministic-only mode never
+    // exercises since prose alone produces no findings here). Folding warnings
+    // into blockers-only citation would silently drop them from `rulesCited` —
+    // a warning-only finding is real evidence, not nothing, and this mode is
+    // the one place in the pipeline that gets to run with zero model cost.
+    const warnings = deterministicFindings.filter((f) => f.severity === 'warning');
+    if (blockers.length) {
+      status = 'incorrect';
+      confidence = 0.95;
+      summary = `${blockers.length} architectural rule violation(s).`;
+      reasoning = blockers.map((f) => `${f.ruleId}: ${f.message}`).join('\n');
+      rulesCited = [...new Set(blockers.map((f) => f.ruleId))];
+    } else if (warnings.length) {
+      status = 'needs_human';
+      confidence = 0.5;
+      summary = `${warnings.length} advisory finding(s); no blocking violation.`;
+      reasoning = warnings.map((f) => `${f.ruleId}: ${f.message}`).join('\n');
+      rulesCited = [...new Set(warnings.map((f) => f.ruleId))];
+    } else {
+      status = 'needs_human';
+      confidence = 0.3;
+      summary = 'No deterministic violation; judgment layer disabled.';
+      reasoning = 'No mechanical violations found.';
+      rulesCited = [];
+    }
     decidedBy = 'deterministic';
   } else {
     providerName = provider.name;
@@ -176,5 +243,7 @@ function inferCategory(ruleIds: string[]): Finding['category'] {
   const id = ruleIds[0] ?? '';
   if (id.startsWith('CAS')) return 'cascading';
   if (id.startsWith('REUSE')) return 'reuse';
+  if (id.startsWith('COMP')) return 'composition';
+  if (id.startsWith('REND')) return 'render';
   return 'encoding';
 }

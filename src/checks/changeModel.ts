@@ -14,10 +14,16 @@
  */
 import type { ProposedChange } from '../types.js';
 import type { BladeGraph } from '../extract/graph.js';
+import type { JsxNode } from '../extract/jsx.js';
+import { extractJsxFromDiff } from '../extract/jsx.js';
+import type { SnapshotDiffFile } from '../extract/snapshot.js';
+import { parseSnapshotDiff, isSnapshotFile } from '../extract/snapshot.js';
 
 export interface DiffFile {
   path: string;
   added: string[];
+  /** New-file line number for each entry in `added`, used to anchor PR comments. */
+  addedLineNumbers: number[];
   removed: string[];
   isNew: boolean;
 }
@@ -27,13 +33,13 @@ export interface ChangeModel {
   signalSource: 'diff' | 'prose' | 'both';
   files: DiffFile[];
   /** Literal colour values (#hex, rgb(...)) introduced by the change. */
-  literalColors: { value: string; file?: string; line: string }[];
+  literalColors: { value: string; file?: string; line: string; lineNumber?: number }[];
   /** Literal dimension values (12px, 1.5rem) introduced by the change. */
-  literalDimensions: { value: string; raw: string; file?: string; line: string }[];
+  literalDimensions: { value: string; raw: string; file?: string; line: string; lineNumber?: number }[];
   /** Dot-notation token paths referenced by the change. */
   tokenPaths: string[];
   /** Token paths the change *declares* (adds to a token module). */
-  declaredTokens: { path: string; value?: string | number; scope: 'global' | 'theme' | 'component' }[];
+  declaredTokens: { path: string; value?: string | number; scope: 'global' | 'theme' | 'component'; file?: string; lineNumber?: number }[];
   /** Components the change targets, resolved against the graph. */
   targetComponents: string[];
   /** Prop names the change introduces or mentions. */
@@ -51,11 +57,19 @@ export interface ChangeModel {
   /** Props named in an additive intent that the component already declares. */
   graphProvenPropHits: { component: string; prop: string }[];
   /** Conditional styling branches introduced (switch/ternary on a variant prop). */
-  conditionalBranches: { file: string; line: string }[];
+  conditionalBranches: { file: string; line: string; lineNumber?: number }[];
   /** True when the change proposes a brand-new component. */
   proposesNewComponent: boolean;
   /** True when the change edits a global/theme token module. */
   touchesSharedTokenModule: boolean;
+  /**
+   * JSX trees added by the diff, per file — Layer 0 for the composition checks.
+   * Extracted from contiguous runs of added lines; see `extract/jsx.ts` for why
+   * this is best-effort rather than a full-checkout parse.
+   */
+  jsxComposition: { file: string; roots: JsxNode[] }[];
+  /** Parsed `.snap` diffs — Layer 0 for the render-output checks. See `extract/snapshot.ts`. */
+  snapshotDiffs: SnapshotDiffFile[];
 }
 
 const HEX_RE = /#(?:[0-9a-fA-F]{3,8})\b/g;
@@ -87,6 +101,7 @@ function allPropNames(graph: BladeGraph, component: string): string[] {
 export function parseDiff(diff: string): DiffFile[] {
   const files: DiffFile[] = [];
   let current: DiffFile | undefined;
+  let newLine: number | undefined;
 
   for (const raw of diff.split('\n')) {
     const fileHeader = raw.match(/^(?:diff --git a\/(\S+) b\/(\S+)|\+\+\+ b\/(\S+))/);
@@ -94,16 +109,29 @@ export function parseDiff(diff: string): DiffFile[] {
       const p = fileHeader[2] ?? fileHeader[3] ?? fileHeader[1];
       if (p && p !== '/dev/null') {
         if (!current || current.path !== p) {
-          current = { path: p, added: [], removed: [], isNew: false };
+          current = { path: p, added: [], addedLineNumbers: [], removed: [], isNew: false };
           files.push(current);
+          newLine = undefined;
         }
       }
       continue;
     }
     if (/^new file mode/.test(raw) && current) current.isNew = true;
     if (!current) continue;
-    if (raw.startsWith('+') && !raw.startsWith('+++')) current.added.push(raw.slice(1));
-    else if (raw.startsWith('-') && !raw.startsWith('---')) current.removed.push(raw.slice(1));
+    const hunk = raw.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    if (hunk) {
+      newLine = Number(hunk[1]);
+      continue;
+    }
+    if (raw.startsWith('+') && !raw.startsWith('+++')) {
+      current.added.push(raw.slice(1));
+      current.addedLineNumbers.push(newLine ?? current.added.length);
+      if (newLine !== undefined) newLine++;
+    } else if (raw.startsWith('-') && !raw.startsWith('---')) {
+      current.removed.push(raw.slice(1));
+    } else if (!raw.startsWith('\\') && newLine !== undefined) {
+      newLine++;
+    }
   }
   return files;
 }
@@ -119,6 +147,7 @@ export function buildChangeModel(change: ProposedChange, graph: BladeGraph): Cha
   const files = change.diff ? parseDiff(change.diff) : [];
   const hasDiff = files.length > 0;
   const prose = change.intent ?? '';
+  const bladeNames = new Set(graph.allComponentNames());
 
   const model: ChangeModel = {
     intent: prose,
@@ -136,6 +165,8 @@ export function buildChangeModel(change: ProposedChange, graph: BladeGraph): Cha
     conditionalBranches: [],
     proposesNewComponent: false,
     touchesSharedTokenModule: false,
+    jsxComposition: [],
+    snapshotDiffs: [],
   };
 
   // ---- signals from the diff (exact) -------------------------------------
@@ -145,12 +176,37 @@ export function buildChangeModel(change: ProposedChange, graph: BladeGraph): Cha
       model.touchesSharedTokenModule = true;
     }
 
-    for (const line of f.added) {
+    // Composition — JSX trees the diff adds, for the COMP-* checks.
+    if (/\.tsx$/.test(f.path) && !/\.(stories|test)\./.test(f.path)) {
+      const roots = extractJsxFromDiff(f, bladeNames);
+      if (roots.length) model.jsxComposition.push({ file: f.path, roots });
+    }
+
+    // Render output — resolved CSS already sitting in a touched snapshot, for the REND-* checks.
+    if (isSnapshotFile(f.path)) {
+      const parsed = parseSnapshotDiff(f);
+      if (parsed && parsed.stories.length) model.snapshotDiffs.push(parsed);
+    }
+
+    // A changed union appears in a diff as the complete before/after line. Only
+    // members present in the after line but absent from the before line are new.
+    // Treating the whole after line as proposed caused every existing member to
+    // be reported as a duplicate.
+    const removedUnions = new Map<string, Set<string>>();
+    for (const line of f.removed) {
+      const propDecl = line.match(/^\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\??\s*:\s*(.+?);?\s*$/);
+      if (!propDecl || !/'[^']+'\s*\|/.test(propDecl[2])) continue;
+      removedUnions.set(propDecl[1], new Set([...propDecl[2].matchAll(/'([^']+)'/g)].map((m) => m[1])));
+    }
+
+    for (let addedIndex = 0; addedIndex < f.added.length; addedIndex++) {
+      const line = f.added[addedIndex];
+      const lineNumber = f.addedLineNumbers[addedIndex];
       if (isStyleSurface) {
-        for (const c of collect(HEX_RE, line)) model.literalColors.push({ value: c.toLowerCase(), file: f.path, line: line.trim() });
-        for (const c of collect(RGB_RE, line)) model.literalColors.push({ value: c, file: f.path, line: line.trim() });
+        for (const c of collect(HEX_RE, line)) model.literalColors.push({ value: c.toLowerCase(), file: f.path, line, lineNumber });
+        for (const c of collect(RGB_RE, line)) model.literalColors.push({ value: c, file: f.path, line, lineNumber });
         for (const m of line.matchAll(DIM_RE)) {
-          model.literalDimensions.push({ value: m[1], raw: m[0], file: f.path, line: line.trim() });
+          model.literalDimensions.push({ value: m[1], raw: m[0], file: f.path, line, lineNumber });
         }
       }
 
@@ -171,6 +227,8 @@ export function buildChangeModel(change: ProposedChange, graph: BladeGraph): Cha
             path: key,
             value: rawVal.startsWith("'") ? rawVal.slice(1, -1) : Number(rawVal),
             scope,
+            file: f.path,
+            lineNumber,
           });
 
           // A diff hunk gives us the leaf key (`medium`) but not the nesting that
@@ -191,14 +249,18 @@ export function buildChangeModel(change: ProposedChange, graph: BladeGraph): Cha
         /\bcase\s+'[a-z]+'\s*:\s*return\b/.test(line) ||
         /\b(variant|emphasis|intent)\s*===\s*'[a-z]+'\s*\?/.test(line)
       ) {
-        model.conditionalBranches.push({ file: f.path, line: line.trim() });
+        model.conditionalBranches.push({ file: f.path, line, lineNumber });
       }
 
       // Prop declarations: `variant?: 'primary' | 'secondary'`
       const propDecl = line.match(/^\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\??\s*:\s*(.+?);?\s*$/);
       if (propDecl && /'[^']+'\s*\|/.test(propDecl[2])) {
-        model.proposedProps.push(propDecl[1]);
-        for (const v of propDecl[2].matchAll(/'([^']+)'/g)) model.proposedVariantValues.push(v[1]);
+        const before = removedUnions.get(propDecl[1]);
+        const after = [...propDecl[2].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+        if (!before) model.proposedProps.push(propDecl[1]);
+        for (const value of after) {
+          if (!before?.has(value)) model.proposedVariantValues.push(value);
+        }
       }
 
       for (const m of line.matchAll(TOKEN_PATH_RE)) {
@@ -285,6 +347,7 @@ export function buildChangeModel(change: ProposedChange, graph: BladeGraph): Cha
         // `validationState` union which also happens to contain "none". Without
         // this guard the checker reports a duplicate that was never proposed.
         const namedAxis =
+          (/\bvariant\b/i.test(prose) && axes.some((a) => a.prop === 'variant') ? 'variant' : undefined) ??
           explicitlyAddedProps.find((p) => axes.some((a) => a.prop === p)) ??
           axes.map((a) => a.prop).find((p) =>
             new RegExp(`(^|[^a-zA-Z])${escapeRegex(p)}\\s+(?:prop|property|variant|axis|values?)\\b`, 'i').test(prose),

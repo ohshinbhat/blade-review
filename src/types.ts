@@ -108,10 +108,10 @@ export interface ProposedChange {
 }
 
 // ---------------------------------------------------------------------------
-// Layer 1 — deterministic findings
+// Layer 1A/1B — deterministic findings and semantic UI-structure reuse
 // ---------------------------------------------------------------------------
 
-export type CheckCategory = 'encoding' | 'cascading' | 'reuse';
+export type CheckCategory = 'encoding' | 'cascading' | 'reuse' | 'composition' | 'render';
 
 export type Severity = 'blocker' | 'warning' | 'info';
 
@@ -123,7 +123,7 @@ export interface Finding {
   /** Concrete evidence pulled from the graph or the diff — never model-generated. */
   evidence: string[];
   /** Machine-applicable fix, rendered as a GitHub suggestion block when available. */
-  suggestion?: { file?: string; before: string; after: string };
+  suggestion?: { file?: string; line?: number; before: string; after: string };
   /** Deterministic checks are exact. Only LLM findings carry uncertainty. */
   provenance: 'DETERMINISTIC' | 'MODEL';
 }

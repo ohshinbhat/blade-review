@@ -1,0 +1,112 @@
+name: Demo UI Architecture Review
+
+# Self-contained demonstration workflow for this repository. It reviews only
+# the mirrored fixture under tmp/ui-cases/active and uses the committed demo
+# graph; the production Blade workflow continues to extract real base/head
+# graphs from razorpay/blade.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'tmp/ui-cases/active/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+concurrency:
+  group: ui-demo-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review-demo-ui:
+    name: Review changed demo UI
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install reviewer
+        run: npm ci
+
+      - name: Build the active-fixture PR diff
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --find-renames --unified=80 "$BASE_SHA" "$HEAD_SHA" -- tmp/ui-cases/active > "$RUNNER_TEMP/ui-demo.patch"
+          test -s "$RUNNER_TEMP/ui-demo.patch"
+
+      # Same-repository branches have a writable GITHUB_TOKEN, so this posts the
+      # real PR review and check run. Reviewer assignment is disabled because a
+      # demo repository is not expected to have Razorpay's design-system team.
+      - name: Post architecture review
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          BLADE_REVIEW_PROVIDER: offline
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          DEMO_INTENT: ${{ github.event.pull_request.title }}
+        run: |
+          set +e
+          node --import tsx src/cli/ci.ts \
+            --graph tmp/ui-cases/demo-graph.json \
+            --diff "$RUNNER_TEMP/ui-demo.patch" \
+            --intent "$DEMO_INTENT" \
+            --skip-reviewer-request 2>&1 | tee "$RUNNER_TEMP/ui-demo-review.log"
+          REVIEW_STATUS=${PIPESTATUS[0]}
+          set -e
+
+          {
+            echo "## Blade demo UI review"
+            echo
+            echo "The full review was posted to this pull request."
+            echo
+            echo "Exit status: \`$REVIEW_STATUS\` (0 = pass/neutral, 1 = changes required)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit "$REVIEW_STATUS"
+
+      # Fork pull requests receive a read-only token. They still run the exact
+      # review and expose the result in the Actions step summary without trying
+      # to mutate the PR.
+      - name: Preview architecture review for fork
+        if: github.event.pull_request.head.repo.full_name != github.repository
+        env:
+          BLADE_REVIEW_PROVIDER: offline
+          DEMO_INTENT: ${{ github.event.pull_request.title }}
+        run: |
+          set +e
+          node --import tsx src/cli/ci.ts \
+            --graph tmp/ui-cases/demo-graph.json \
+            --diff "$RUNNER_TEMP/ui-demo.patch" \
+            --intent "$DEMO_INTENT" \
+            --skip-reviewer-request \
+            --dry-run 2>&1 | tee "$RUNNER_TEMP/ui-demo-review.log"
+          REVIEW_STATUS=${PIPESTATUS[0]}
+          set -e
+
+          {
+            echo "## Blade demo UI review"
+            echo
+            echo "Fork pull requests are preview-only because their token is read-only."
+            echo
+            echo '```text'
+            sed -n '1,220p' "$RUNNER_TEMP/ui-demo-review.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit "$REVIEW_STATUS"

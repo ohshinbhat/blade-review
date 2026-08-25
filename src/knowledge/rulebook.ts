@@ -188,6 +188,111 @@ export const RULEBOOK: Rule[] = [
     source: `${BLADE_AGENTS} § Common Patterns — "do not use negative prop names isNotVisible or inconsistent names like loading instead of isLoading".`,
     deterministic: true,
   },
+
+  // ---------------------------------------------------------------------
+  // Correct composition — the JSX tree the change builds
+  // ---------------------------------------------------------------------
+  {
+    id: 'COMP-001',
+    title: 'Compose with Blade primitives, not raw intrinsics',
+    category: 'composition',
+    severity: 'warning',
+    statement:
+      'Where an equivalent Blade primitive exists (Box for layout containers, Typography for text, Button/Input/Link/List/Table for their raw HTML counterparts), a raw HTML/View intrinsic should not be used in its place. The intrinsic renders, but it bypasses the component layer that token-driven styling and web/native parity are applied through.',
+    source: `${BLADE_AGENTS} § Package Structure — "ships React (web) and React Native components from a single shared codebase"; § Common Patterns — new structures should stay "consistent with existing components." A raw intrinsic where a primitive already exists is the composition-level version of that same consistency requirement.`,
+    deterministic: true,
+    examples: {
+      incorrect: '<div style={{ padding: 4 }}>Total</div>',
+      correct: '<Box padding="spacing.2"><Typography>Total</Typography></Box>',
+    },
+  },
+  {
+    id: 'COMP-002',
+    title: 'No inline style/css props on composed elements',
+    category: 'composition',
+    severity: 'blocker',
+    statement:
+      'An element must not be styled with a `style` or `css` prop carrying an object/expression value. This is the same violation ENC-001 catches for a bare CSS declaration, one level up: an inline style object is a bundle of hard-coded literal values, not a token reference.',
+    source: `${RFC_TOKENS} § Summary — "Design tokens are pieces of data that take the place of hard-coded properties." Applies identically whether the hard-coded values arrive as a raw declaration or as an inline style/css prop.`,
+    deterministic: true,
+    examples: {
+      incorrect: '<Box style={{ borderRadius: 12 }} />',
+      correct: '<Box borderRadius="medium" />',
+    },
+  },
+  {
+    id: 'COMP-003',
+    title: 'Reuse an existing Blade composition before rebuilding raw UI structure',
+    category: 'composition',
+    severity: 'warning',
+    statement:
+      'When most elements in an added JSX subtree have verified Blade primitive equivalents, compose the UI from those existing components instead of rebuilding the same container, text, control, list, or table structure with raw intrinsics.',
+    source: `${BLADE_AGENTS} § Package Structure — Blade ships shared web/native components; § Common Patterns — new component structures must remain consistent with existing components. The recommendation is emitted only for primitives present in the extracted component graph.`,
+    deterministic: true,
+    examples: {
+      incorrect: '<section><h3>Total</h3><button>Pay</button></section>',
+      correct: '<Box><Typography>Total</Typography><Button>Pay</Button></Box>',
+    },
+  },
+  {
+    id: 'COMP-004',
+    title: 'Interactive elements do not nest; text primitives do not wrap themselves',
+    category: 'composition',
+    severity: 'blocker',
+    statement:
+      'An interactive component (Button, Link, Checkbox, Radio, Switch, Chip, SegmentedControl, FloatingActionButton) must not be composed inside another interactive component — the inner control becomes unreachable and the DOM/AT roles collide. A Typography element should not be nested inside another Typography element.',
+    source:
+      'packages/blade/src/components/Button/_decisions/decisions.md § Open Questions — on Link vs Button: "We would have another Link component that will be an <a> tag. We do this to maintain the correct roles for button & link components." Nesting interactive roles breaks the exact guarantee that decision exists to preserve.',
+    deterministic: true,
+    examples: {
+      incorrect: '<Button><Link href="/help">Help</Link></Button>',
+      correct: '<Button icon={HelpIcon} accessibilityLabel="Help" onClick={goToHelp} />',
+    },
+  },
+  {
+    id: 'COMP-005',
+    title: 'A variant-axis prop must be set to one of its declared values',
+    category: 'composition',
+    severity: 'blocker',
+    statement:
+      "Where JSX passes a string literal to a prop the component's own extracted type declares as a variant axis (a string-literal union), the literal must be one of that union's members. Complements REUSE-003: that rule catches a PR proposing to add a value that already exists on the union; this one catches a value used in JSX that was never added to the union at all.",
+    source:
+      "Enforced by each component's own Props type, extracted per-component from the AST — not recalled, not a style guide. Uses the same `variantAxes` extraction REUSE-003 already relies on for prior-art checks.",
+    deterministic: true,
+    examples: {
+      incorrect: '<Button variant="quaternary">Pay</Button>  // Button.variant only allows primary | secondary | tertiary',
+      correct: '<Button variant="tertiary">Pay</Button>',
+    },
+  },
+
+  // ---------------------------------------------------------------------
+  // Correct render output — what the change actually renders
+  // ---------------------------------------------------------------------
+  {
+    id: 'REND-001',
+    title: 'Rendered values must land on the token scale',
+    category: 'render',
+    severity: 'blocker',
+    statement:
+      'Every resolved pixel value in a diffed snapshot must match an existing token value. This is ENC-001 checked on the computed output rather than the source literal — it catches a value that emerged from arithmetic, a wrong theme lookup, or a bad prop default, which no source-level check can see because no literal was ever typed.',
+    source: `${RFC_TOKENS} § Summary — the same "tokens replace hard-coded properties" requirement as ENC-001, applied to what the component actually renders instead of what was written by hand.`,
+    deterministic: true,
+    examples: {
+      incorrect: 'snapshot shows `padding: 15px;` (no token holds 15 — 16 is spacing.5)',
+      correct: 'snapshot shows `padding: 16px;` (spacing.5)',
+    },
+  },
+  {
+    id: 'REND-002',
+    title: 'Web and native must render the same resolved values',
+    category: 'render',
+    severity: 'blocker',
+    statement:
+      'When a diff updates both the web and native snapshot of the same story, the resolved values for layout-affecting properties (padding, margin, border-radius, gap, size, font-size) must match. This is CAS-004 checked on rendered output: two files can each look correct in isolation and still leave the two platforms rendering different things.',
+    source:
+      'rfcs/writing-cross-platform-typescript.md — the same single-codebase parity requirement CAS-004 enforces on source files, checked here on the two platforms’ actual resolved output.',
+    deterministic: true,
+  },
 ];
 
 export const RULES_BY_ID = new Map(RULEBOOK.map((r) => [r.id, r]));

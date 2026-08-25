@@ -34,6 +34,16 @@ export interface ContextBundle {
   cascade: CascadeImpact[];
   /** Components that already expose the proposed props, for the reuse question. */
   priorArt: { prop: string; usedBy: { component: string; allowedValues: string[] }[] }[];
+  proposedNewComponent: boolean;
+  similarComponents: {
+    proposed: string;
+    candidate: string;
+    sharedProps: string[];
+    proposedProps: string[];
+    candidateProps: string[];
+    /** Coverage of the proposed surface by the existing component. */
+    score: number;
+  }[];
   deterministicFindings: Finding[];
   excerpts: { source: string; text: string }[];
   approxTokens: number;
@@ -61,6 +71,7 @@ export function buildContext(
   m: ChangeModel,
   g: BladeGraph,
   deterministicFindings: Finding[],
+  prior: BladeGraph = g,
 ): ContextBundle {
   // Rules: everything the change could plausibly touch. The rulebook is small
   // enough to send whole, which is deliberate — the model must never invent a
@@ -122,8 +133,37 @@ export function buildContext(
 
   const priorArt = m.proposedProps.map((prop) => ({
     prop,
-    usedBy: g.componentsWithProp(prop).filter((c) => c.allowedValues.length).slice(0, 10),
+    usedBy: prior.componentsWithProp(prop).filter((c) => c.allowedValues.length).slice(0, 10),
   }));
+
+  // For a new component PR, give the judgment layer concrete existing surfaces
+  // to compare instead of asking it to recall Blade components from memory.
+  const similarComponents: ContextBundle['similarComponents'] = [];
+  if (m.proposesNewComponent) {
+    for (const proposedName of m.targetComponents) {
+      const proposedNode = g.component(proposedName);
+      const proposedProps = [...new Set(proposedNode?.props.map((p) => p.name) ?? m.proposedProps)].sort();
+      if (!proposedProps.length) continue;
+      for (const candidateNode of prior.graph.components) {
+        if (candidateNode.name === proposedName) continue;
+        const candidateProps = [...new Set(candidateNode.props.map((p) => p.name))].sort();
+        const candidateSet = new Set(candidateProps);
+        const sharedProps = proposedProps.filter((p) => candidateSet.has(p));
+        const score = sharedProps.length / proposedProps.length;
+        if (sharedProps.length < 2 || score < 0.3) continue;
+        similarComponents.push({
+          proposed: proposedName,
+          candidate: candidateNode.name,
+          sharedProps,
+          proposedProps,
+          candidateProps,
+          score,
+        });
+      }
+    }
+    similarComponents.sort((a, b) => b.score - a.score || b.sharedProps.length - a.sharedProps.length);
+    similarComponents.splice(8);
+  }
 
   const excerpts: { source: string; text: string }[] = [];
   const docs = g.graph.documents;
@@ -148,6 +188,8 @@ export function buildContext(
     candidateTokens: [...candidateSet.values()].slice(0, 40),
     cascade,
     priorArt,
+    proposedNewComponent: m.proposesNewComponent,
+    similarComponents,
     deterministicFindings,
     excerpts,
     approxTokens: 0,

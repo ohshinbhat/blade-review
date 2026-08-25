@@ -26,6 +26,10 @@ export interface Metrics {
   falseRejectRate: number;
   falseRejectCount: number;
   deferralRate: number;
+  /** Expected-correct cases that were actually approved. */
+  correctApprovalRate: number;
+  /** Cases receiving an enforceable yes/no rather than a deferral. */
+  decisionCoverage: number;
   ruleCitationAccuracy: number;
   cascadeRecall: number | null;
   meanLatencyMs: number;
@@ -61,7 +65,7 @@ export function computeMetrics(results: CaseResult[]): Metrics {
     : null;
 
   const byCategory: Metrics['byCategory'] = {};
-  for (const cat of ['encoding', 'cascading', 'reuse'] as CheckCategory[]) {
+  for (const cat of ['encoding', 'cascading', 'reuse', 'composition', 'render'] as CheckCategory[]) {
     const subset = results.filter((r) => r.case.category === cat);
     if (!subset.length) continue;
     byCategory[cat] = {
@@ -94,6 +98,10 @@ export function computeMetrics(results: CaseResult[]): Metrics {
     falseRejectRate: shouldApprove ? falseRejects.length / shouldApprove : 0,
     falseRejectCount: falseRejects.length,
     deferralRate: n ? deferrals.length / n : 0,
+    correctApprovalRate: shouldApprove
+      ? results.filter((r) => r.case.expected.status === 'correct' && r.actual === 'correct').length / shouldApprove
+      : 0,
+    decisionCoverage: n ? results.filter((r) => r.actual !== 'needs_human').length / n : 0,
     ruleCitationAccuracy: citable.length ? citedRight / citable.length : 0,
     cascadeRecall,
     meanLatencyMs: n ? results.reduce((s, r) => s + r.latencyMs, 0) / n : 0,
@@ -141,6 +149,8 @@ export function renderMetrics(m: Metrics, label: string, variance?: { flakyCases
     out.push(`  cascade recall       ${bar(m.cascadeRecall)}  ${pct(m.cascadeRecall)}  (deterministic — should be 100%)`);
   }
   out.push(`  deferral rate        ${bar(m.deferralRate)}  ${pct(m.deferralRate)}  (routed to a human)`);
+  out.push(`  correct approvals    ${bar(m.correctApprovalRate)}  ${pct(m.correctApprovalRate)}  (recall on positive controls)`);
+  out.push(`  decision coverage    ${bar(m.decisionCoverage)}  ${pct(m.decisionCoverage)}  (automatic yes/no)`);
   if (variance) {
     out.push(`  run-to-run stability ${bar(variance.stability)}  ${pct(variance.stability)}${variance.flakyCases.length ? `  flaky: ${variance.flakyCases.join(', ')}` : ''}`);
   }

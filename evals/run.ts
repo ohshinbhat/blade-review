@@ -20,7 +20,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { loadGraph } from '../src/extract/index.js';
 import { review } from '../src/engine/review.js';
-import { generateMutations } from './mutate.js';
+import { generateMutations, generatePositiveControls } from './mutate.js';
 import { computeMetrics, computeVariance, renderMetrics } from './metrics.js';
 import type { EvalCase, CaseResult } from './types.js';
 import type { BladeGraph } from '../src/extract/graph.js';
@@ -37,7 +37,8 @@ function loadCases(g: BladeGraph): EvalCase[] {
     handwritten.push(...(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) as EvalCase[]));
   }
   const mutations = generateMutations(g);
-  return [...handwritten, ...mutations];
+  const positives = generatePositiveControls(g);
+  return [...handwritten, ...mutations, ...positives];
 }
 
 async function runCase(
@@ -131,9 +132,13 @@ async function main(): Promise<void> {
 
   process.stdout.write(`\n  Blade architecture review — eval suite\n`);
   process.stdout.write(`  blade@${graph.bladeRef} · ${cases.length} cases · ${runs} run(s)\n`);
-  process.stdout.write(
-    `  provider: ${process.env.ANTHROPIC_API_KEY ? `anthropic (${process.env.BLADE_REVIEW_MODEL ?? 'claude-sonnet-4-5'})` : 'offline (no ANTHROPIC_API_KEY set)'}\n`,
-  );
+  const remoteProvider = !!(process.env.ANTHROPIC_API_KEY || process.env.OPENROUTER_API_KEY);
+  const providerLabel = process.env.OPENROUTER_API_KEY && !process.env.ANTHROPIC_API_KEY
+    ? `openrouter (${process.env.BLADE_REVIEW_MODEL ?? 'openai/gpt-4o-mini'})`
+    : process.env.ANTHROPIC_API_KEY
+      ? `anthropic (${process.env.BLADE_REVIEW_MODEL ?? 'claude-sonnet-4-5'})`
+      : 'offline (no model API key set)';
+  process.stdout.write(`  provider: ${providerLabel}\n`);
 
   // Arm 1 — deterministic floor.
   const floorResults = await runAll(cases, graph, true);
@@ -175,6 +180,27 @@ async function main(): Promise<void> {
   if (fullMetrics.falseApproveCount > budget) {
     process.stderr.write(
       `  FAIL: ${fullMetrics.falseApproveCount} false approve(s), budget is ${budget}.\n\n`,
+    );
+    process.exit(1);
+  }
+
+  // A configured judgment layer must prove it can make useful positive decisions,
+  // not merely avoid false approvals by deferring everything.
+  const minCorrectApproval = Number(
+    process.env.EVAL_MIN_CORRECT_APPROVAL_RATE ?? (remoteProvider ? 0.5 : 0),
+  );
+  const minDecisionCoverage = Number(
+    process.env.EVAL_MIN_DECISION_COVERAGE ?? (remoteProvider ? 0.75 : 0),
+  );
+  if (
+    fullMetrics.correctApprovalRate < minCorrectApproval ||
+    fullMetrics.decisionCoverage < minDecisionCoverage
+  ) {
+    process.stderr.write(
+      `  FAIL: correct approval rate ${(fullMetrics.correctApprovalRate * 100).toFixed(1)}% ` +
+      `(minimum ${(minCorrectApproval * 100).toFixed(1)}%); decision coverage ` +
+      `${(fullMetrics.decisionCoverage * 100).toFixed(1)}% ` +
+      `(minimum ${(minDecisionCoverage * 100).toFixed(1)}%).\n\n`,
     );
     process.exit(1);
   }

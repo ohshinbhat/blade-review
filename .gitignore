@@ -1,4 +1,28 @@
+# Dependencies
 node_modules/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Generated project data
 data/blade-graph.json
 evals/results.json
-.env
+
+# Build, test, and tool output
+dist/
+coverage/
+.cache/
+.npm-cache/
+*.tsbuildinfo
+*.log
+npm-debug.log*
+
+# Editor and operating-system files
+.DS_Store
+**/.DS_Store
+.idea/
+.vscode/
+*.swp
+*~

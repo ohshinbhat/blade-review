@@ -117,6 +117,23 @@ export function buildUserMessage(m: ChangeModel, bundle: ContextBundle): string 
     }
   }
 
+  if (bundle.proposedNewComponent) {
+    parts.push('\n## NEW COMPONENT DUPLICATION CHECK');
+    if (bundle.similarComponents.length) {
+      parts.push('Compare the proposed component against these existing Blade component surfaces:');
+      for (const c of bundle.similarComponents) {
+        parts.push(
+          `  - ${c.proposed} vs ${c.candidate}: ${(c.score * 100).toFixed(0)}% of proposed props overlap; shared: ${c.sharedProps.join(', ')}`,
+        );
+        parts.push(`      proposed props: ${c.proposedProps.join(', ')}`);
+        parts.push(`      existing props: ${c.candidateProps.join(', ')}`);
+      }
+      parts.push('Apply REUSE-004 when this evidence shows the proposal is a variant of an existing component.');
+    } else {
+      parts.push('No comparable prop surface could be extracted. Do not approve duplication safety; defer if it cannot be established from the diff.');
+    }
+  }
+
   if (bundle.cascade.length) {
     parts.push('\n## CASCADE (computed from the AST — authoritative)');
     for (const c of bundle.cascade) {

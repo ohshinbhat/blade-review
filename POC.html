@@ -1,1192 +1,1123 @@
-<title>Blade PR Review Agent</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
-
-<style>
-  /* ── Tokens ───────────────────────────────────────────────────────────────
-     Neutrals carry a blue-grey bias, matching Blade's own `blueGrayLight`
-     neutral scale rather than a default mid-grey.                            */
-  :root {
-    --ground:        #FBFCFE;
-    --surface:       #FFFFFF;
-    --surface-sunk:  #F3F6FA;
-    --ink:           #0F141C;
-    --ink-soft:      #39434F;
-    --ink-muted:     #6B7684;
-    --rule:          #E1E7EF;
-    --rule-strong:   #C9D3DF;
-
-    --accent:        #3B4FD8;
-    --accent-soft:   #EEF0FE;
-    --accent-ink:    #2B3AAE;
-
-    --blocker:       #C2334D;
-    --blocker-soft:  #FDEEF1;
-    --warn:          #A8680C;
-    --warn-soft:     #FDF3E4;
-    --pass:          #12794F;
-    --pass-soft:     #E9F6EF;
-
-    --shadow: 0 1px 2px rgba(15, 20, 28, .05), 0 8px 24px -12px rgba(15, 20, 28, .12);
-
-    --display: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-    --body: "Source Serif 4", Georgia, "Times New Roman", serif;
-    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
-
-    --measure: 68ch;
-    --s1: .5rem;  --s2: .75rem; --s3: 1rem;   --s4: 1.5rem;
-    --s5: 2rem;   --s6: 3rem;   --s7: 4.5rem;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --ground:        #0B0F16;
-      --surface:       #121822;
-      --surface-sunk:  #0E141D;
-      --ink:           #E8EDF5;
-      --ink-soft:      #B7C2D0;
-      --ink-muted:     #7C8899;
-      --rule:          #212B39;
-      --rule-strong:   #33404F;
-
-      --accent:        #8C97F5;
-      --accent-soft:   #1A2044;
-      --accent-ink:    #A9B2F8;
-
-      --blocker:       #F0899C;
-      --blocker-soft:  #33161D;
-      --warn:          #E5AE5C;
-      --warn-soft:     #2E2313;
-      --pass:          #66C99A;
-      --pass-soft:     #10281D;
-
-      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Blade Review checks whether design-system changes are built correctly.">
+  <title>Blade Review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=Inter:wght@400;500;600;700&amp;display=swap">
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --surface: #ffffff;
+      --surface-soft: #f0f3f8;
+      --ink: #111827;
+      --muted: #667085;
+      --line: #e3e7ee;
+      --brand: #4457d9;
+      --danger: #c4324d;
+      --danger-soft: #fff1f3;
+      --success: #16805b;
+      --success-soft: #ebf8f2;
+      --shadow: 0 18px 48px -32px rgba(26, 35, 65, .32);
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     }
-  }
 
-  :root[data-theme="dark"] {
-    --ground:        #0B0F16;
-    --surface:       #121822;
-    --surface-sunk:  #0E141D;
-    --ink:           #E8EDF5;
-    --ink-soft:      #B7C2D0;
-    --ink-muted:     #7C8899;
-    --rule:          #212B39;
-    --rule-strong:   #33404F;
-
-    --accent:        #8C97F5;
-    --accent-soft:   #1A2044;
-    --accent-ink:    #A9B2F8;
-
-    --blocker:       #F0899C;
-    --blocker-soft:  #33161D;
-    --warn:          #E5AE5C;
-    --warn-soft:     #2E2313;
-    --pass:          #66C99A;
-    --pass-soft:     #10281D;
-
-    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
-  }
-
-  /* ── Base ─────────────────────────────────────────────────────────────── */
-  * { box-sizing: border-box; }
-
-  body {
-    background: var(--ground);
-    color: var(--ink);
-    font-family: var(--body);
-    font-size: 1.0625rem;
-    line-height: 1.68;
-    margin: 0;
-    -webkit-font-smoothing: antialiased;
-  }
-
-  .page {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: var(--s6);
-    max-width: 1240px;
-    margin: 0 auto;
-    padding: var(--s5) var(--s4) var(--s7);
-  }
-
-  @media (min-width: 1080px) {
-    .page {
-      grid-template-columns: 210px minmax(0, 1fr);
-      gap: var(--s7);
-      padding-inline: var(--s5);
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--sans);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
     }
-  }
+    a { color: inherit; }
+    code { font-family: var(--mono); }
+    :focus-visible { outline: 3px solid rgba(68, 87, 217, .35); outline-offset: 3px; }
 
-  main { min-width: 0; }
-  main > * { max-width: var(--measure); }
-  main > .bleed { max-width: 100%; }
-
-  /* ── Type ─────────────────────────────────────────────────────────────── */
-  h1, h2, h3, h4 {
-    font-family: var(--display);
-    text-wrap: balance;
-    line-height: 1.2;
-    margin: 0;
-  }
-
-  h1 {
-    font-size: clamp(2.1rem, 1.4rem + 2.6vw, 3.1rem);
-    font-weight: 700;
-    letter-spacing: -.028em;
-  }
-
-  h2 {
-    font-size: clamp(1.5rem, 1.2rem + 1.1vw, 1.95rem);
-    font-weight: 600;
-    letter-spacing: -.02em;
-    margin-top: var(--s7);
-    padding-top: var(--s4);
-    border-top: 1px solid var(--rule);
-  }
-
-  h3 {
-    font-size: 1.18rem;
-    font-weight: 600;
-    letter-spacing: -.012em;
-    margin-top: var(--s5);
-  }
-
-  h4 {
-    font-size: .96rem;
-    font-weight: 600;
-    margin-top: var(--s4);
-  }
-
-  p { margin: var(--s3) 0; }
-
-  a { color: var(--accent-ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
-  a:hover { color: var(--accent); }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
-
-  strong { font-weight: 600; color: var(--ink); }
-
-  code {
-    font-family: var(--mono);
-    font-size: .855em;
-    background: var(--surface-sunk);
-    border: 1px solid var(--rule);
-    border-radius: 4px;
-    padding: .08em .34em;
-  }
-
-  ul, ol { padding-left: 1.15rem; margin: var(--s3) 0; }
-  li { margin: .38rem 0; }
-  li::marker { color: var(--ink-muted); }
-
-  /* ── Eyebrow / labels ─────────────────────────────────────────────────── */
-  .eyebrow {
-    font-family: var(--mono);
-    font-size: .715rem;
-    font-weight: 500;
-    letter-spacing: .13em;
-    text-transform: uppercase;
-    color: var(--ink-muted);
-    margin: 0 0 var(--s2);
-  }
-
-  /* ── Masthead ─────────────────────────────────────────────────────────── */
-  .masthead { max-width: none; margin-bottom: var(--s6); }
-
-  .lede {
-    font-size: 1.24rem;
-    line-height: 1.56;
-    color: var(--ink-soft);
-    max-width: 58ch;
-    margin-top: var(--s3);
-  }
-
-  .thesis {
-    font-family: var(--display);
-    font-size: 1.06rem;
-    font-weight: 500;
-    line-height: 1.5;
-    color: var(--ink);
-    background: var(--accent-soft);
-    border-left: 3px solid var(--accent);
-    border-radius: 0 6px 6px 0;
-    padding: var(--s3) var(--s4);
-    margin-top: var(--s4);
-    max-width: 62ch;
-  }
-
-  .meta-strip {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--s1) var(--s4);
-    font-family: var(--mono);
-    font-size: .765rem;
-    color: var(--ink-muted);
-    margin-top: var(--s4);
-    padding-top: var(--s3);
-    border-top: 1px solid var(--rule);
-  }
-  .meta-strip b { color: var(--ink-soft); font-weight: 500; }
-
-  /* ── Nav rail ─────────────────────────────────────────────────────────── */
-  .rail { display: none; }
-
-  @media (min-width: 1080px) {
-    .rail {
-      display: block;
-      position: sticky;
-      top: var(--s4);
-      align-self: start;
-      max-height: calc(100vh - var(--s6));
-      overflow-y: auto;
-      font-family: var(--display);
-      font-size: .8rem;
-      line-height: 1.4;
-    }
-    .rail ol { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .1rem; }
-    .rail a {
+    .shell { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
+    .topbar {
+      height: 72px;
       display: flex;
-      gap: .6rem;
-      padding: .38rem .5rem;
-      color: var(--ink-muted);
-      text-decoration: none;
-      border-radius: 5px;
-      border-left: 2px solid transparent;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
     }
-    .rail a:hover { color: var(--ink); background: var(--surface-sunk); }
-    .rail .num { font-family: var(--mono); font-size: .7rem; opacity: .65; padding-top: .12rem; }
-  }
+    .brand { display: flex; align-items: center; gap: 11px; font-weight: 700; letter-spacing: -.02em; }
+    .mark {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: var(--ink);
+      color: white;
+      display: grid;
+      place-items: center;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+    nav { display: flex; gap: 26px; color: var(--muted); font-size: 14px; }
+    nav a { text-decoration: none; }
+    nav a:hover { color: var(--ink); }
 
-  /* ── Panels ───────────────────────────────────────────────────────────── */
-  .panel {
-    background: var(--surface);
-    border: 1px solid var(--rule);
-    border-radius: 8px;
-    padding: var(--s4);
-    margin: var(--s4) 0;
-    box-shadow: var(--shadow);
-  }
+    .hero {
+      display: grid;
+      grid-template-columns: 1.05fr .95fr;
+      gap: 72px;
+      align-items: center;
+      padding: 96px 0 104px;
+    }
+    .eyebrow {
+      margin: 0 0 18px;
+      color: var(--brand);
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 {
+      max-width: 700px;
+      margin-bottom: 24px;
+      font-size: clamp(42px, 6vw, 68px);
+      line-height: 1.02;
+      letter-spacing: -.055em;
+      text-wrap: balance;
+    }
+    .hero-copy {
+      max-width: 590px;
+      margin-bottom: 32px;
+      color: var(--muted);
+      font-size: 19px;
+      line-height: 1.65;
+    }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+    .button {
+      min-height: 44px;
+      padding: 10px 17px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: var(--surface);
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .button.primary { background: var(--ink); border-color: var(--ink); color: white; }
 
-  .panel-tight { padding: var(--s3) var(--s4); }
+    .review-card {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .window-bar {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 13px 16px;
+      background: var(--surface-soft);
+      border-bottom: 1px solid var(--line);
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #c7ceda; }
+    .window-label { margin-left: auto; color: var(--muted); font-family: var(--mono); font-size: 11px; }
+    .review-body { padding: 26px; }
+    .status { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .status-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--danger-soft);
+      color: var(--danger);
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+    }
+    .status strong { font-size: 17px; }
+    .confidence { margin-left: auto; color: var(--muted); font-family: var(--mono); font-size: 11px; }
+    .summary { color: var(--muted); font-size: 14px; margin-bottom: 22px; }
+    .finding { padding: 15px 0; border-top: 1px solid var(--line); }
+    .finding:first-of-type { border-top: 0; }
+    .finding-head { display: flex; gap: 9px; align-items: center; margin-bottom: 6px; }
+    .tag {
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .tag.danger { color: var(--danger); background: var(--danger-soft); }
+    .tag.proven { color: var(--success); background: var(--success-soft); }
+    .rule { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+    .finding p { margin: 0; font-size: 13px; line-height: 1.55; }
+    .review-meta {
+      display: flex;
+      justify-content: space-between;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 10px;
+    }
 
-  .note {
-    background: var(--surface-sunk);
-    border: 1px solid var(--rule);
-    border-radius: 6px;
-    padding: var(--s3) var(--s4);
-    margin: var(--s4) 0;
-    font-size: .96rem;
-    color: var(--ink-soft);
-  }
-  .note p:first-child { margin-top: 0; }
-  .note p:last-child { margin-bottom: 0; }
+    section { padding: 88px 0; border-top: 1px solid var(--line); }
+    .section-head { max-width: 620px; margin-bottom: 44px; }
+    h2 { margin-bottom: 14px; font-size: clamp(30px, 4vw, 42px); line-height: 1.15; letter-spacing: -.04em; }
+    .section-head > p:last-child { color: var(--muted); font-size: 17px; }
 
-  /* ── Code blocks ──────────────────────────────────────────────────────── */
-  .code {
-    font-family: var(--mono);
-    font-size: .795rem;
-    line-height: 1.62;
-    background: var(--surface-sunk);
-    border: 1px solid var(--rule);
-    border-radius: 7px;
-    padding: var(--s3) var(--s4);
-    margin: var(--s3) 0;
-    overflow-x: auto;
-    white-space: pre;
-    color: var(--ink-soft);
-  }
-  .code b { color: var(--ink); font-weight: 600; }
-  .code .c { color: var(--ink-muted); }
-  .code .add { color: var(--pass); }
-  .code .del { color: var(--blocker); }
-  .code .k  { color: var(--accent-ink); }
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .step {
+      padding: 26px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface);
+    }
+    .step-number { color: var(--brand); font-family: var(--mono); font-size: 12px; font-weight: 600; }
+    .step h3 { margin: 18px 0 9px; font-size: 18px; letter-spacing: -.02em; }
+    .step p { margin: 0; color: var(--muted); font-size: 14px; }
 
-  /* ── Tables ───────────────────────────────────────────────────────────── */
-  .table-wrap { overflow-x: auto; margin: var(--s4) 0; }
+    .demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .panel { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+    .panel-title { padding: 14px 18px; border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 600; }
+    pre {
+      margin: 0;
+      padding: 22px;
+      min-height: 196px;
+      overflow-x: auto;
+      background: #151922;
+      color: #d8deea;
+      font: 12px/1.7 var(--mono);
+      white-space: pre-wrap;
+    }
+    .minus { color: #f397a7; }
+    .plus { color: #7dd9ad; }
+    .answer { min-height: 196px; padding: 22px; }
+    .answer-row { display: grid; grid-template-columns: 24px 1fr; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+    .answer-row:first-child { padding-top: 0; }
+    .answer-row:last-child { padding-bottom: 0; border-bottom: 0; }
+    .answer-icon { color: var(--brand); font-family: var(--mono); font-size: 12px; font-weight: 600; }
+    .answer-row strong { display: block; margin-bottom: 3px; font-size: 13px; }
+    .answer-row span { color: var(--muted); font-size: 13px; }
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: var(--display);
-    font-size: .875rem;
-    line-height: 1.45;
-  }
-  th, td {
-    text-align: left;
-    padding: .62rem .8rem;
-    border-bottom: 1px solid var(--rule);
-    vertical-align: top;
-  }
-  th {
-    font-family: var(--mono);
-    font-size: .7rem;
-    font-weight: 500;
-    letter-spacing: .09em;
-    text-transform: uppercase;
-    color: var(--ink-muted);
-    border-bottom: 1px solid var(--rule-strong);
-    white-space: nowrap;
-  }
-  td code { font-size: .82em; }
-  tbody tr:last-child td { border-bottom: none; }
-  .num-cell { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .principles { display: grid; grid-template-columns: 1fr 1fr; gap: 52px; align-items: start; }
+    .principles-copy > p { color: var(--muted); }
+    .principle-list { display: flex; flex-direction: column; }
+    .principle { padding: 20px 0; border-bottom: 1px solid var(--line); }
+    .principle:first-child { padding-top: 0; }
+    .principle:last-child { border-bottom: 0; }
+    .principle h3 { margin: 0 0 5px; font-size: 15px; }
+    .principle p { margin: 0; color: var(--muted); font-size: 14px; }
 
-  /* ── Metric grid ──────────────────────────────────────────────────────── */
-  .metrics {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
-    gap: 1px;
-    background: var(--rule);
-    border: 1px solid var(--rule);
-    border-radius: 8px;
-    overflow: hidden;
-    margin: var(--s4) 0;
-  }
-  .metric { background: var(--surface); padding: var(--s3) var(--s4) var(--s4); }
-  .metric .k {
-    font-family: var(--mono);
-    font-size: .69rem;
-    letter-spacing: .1em;
-    text-transform: uppercase;
-    color: var(--ink-muted);
-    display: block;
-    margin-bottom: .5rem;
-  }
-  .metric .v {
-    font-family: var(--display);
-    font-size: 1.85rem;
-    font-weight: 600;
-    letter-spacing: -.03em;
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-    display: block;
-  }
-  .metric .d {
-    font-family: var(--display);
-    font-size: .765rem;
-    color: var(--ink-muted);
-    line-height: 1.35;
-    display: block;
-    margin-top: .5rem;
-  }
-  .metric.is-critical .v { color: var(--pass); }
-  .metric.is-accent .v { color: var(--accent); }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .info-card { padding: 26px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+    .info-card h3 { margin-bottom: 9px; font-size: 18px; letter-spacing: -.02em; }
+    .info-card p { margin: 0; color: var(--muted); font-size: 14px; }
+    .info-card.highlight { background: #f1f3ff; border-color: #d9ddff; }
 
-  /* ── Verdict chips ────────────────────────────────────────────────────── */
-  .chip {
-    display: inline-flex;
-    align-items: center;
-    gap: .38rem;
-    font-family: var(--mono);
-    font-size: .7rem;
-    font-weight: 500;
-    letter-spacing: .045em;
-    text-transform: uppercase;
-    padding: .2rem .5rem;
-    border-radius: 4px;
-    white-space: nowrap;
-  }
-  .chip-blocker { background: var(--blocker-soft); color: var(--blocker); }
-  .chip-warn    { background: var(--warn-soft);    color: var(--warn); }
-  .chip-pass    { background: var(--pass-soft);    color: var(--pass); }
-  .chip-accent  { background: var(--accent-soft);  color: var(--accent-ink); }
+    .pipeline { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 34px; }
+    .layer-card { position: relative; padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+    .layer-card:not(:last-child)::after { content: "→"; position: absolute; z-index: 2; top: 50%; right: -19px; color: #a6aebb; font-family: var(--mono); }
+    .layer-id { color: var(--brand); font: 600 11px var(--mono); }
+    .layer-card h3 { margin: 15px 0 7px; font-size: 15px; }
+    .layer-card p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
 
-  /* ── Finding cards: provenance encoded in the border ──────────────────── */
-  .finding {
-    border-left: 3px solid var(--rule-strong);
-    background: var(--surface);
-    border-radius: 0 6px 6px 0;
-    padding: var(--s3) var(--s4);
-    margin: var(--s3) 0;
-    font-size: .93rem;
-  }
-  /* Solid rail = proven by static analysis. Dashed = model judgment.
-     The visual difference is the epistemic difference.                      */
-  .finding.proven    { border-left-style: solid; border-left-color: var(--blocker); }
-  .finding.judgment  { border-left-style: dashed; border-left-color: var(--warn); }
-  .finding .fhead {
-    font-family: var(--mono);
-    font-size: .755rem;
-    letter-spacing: .06em;
-    color: var(--ink-muted);
-    display: flex;
-    gap: .6rem;
-    align-items: center;
-    flex-wrap: wrap;
-    margin-bottom: .45rem;
-  }
-  .finding .fhead b { color: var(--ink); font-weight: 600; letter-spacing: .02em; }
-  .finding p { margin: .3rem 0; }
-  .finding .ev {
-    font-family: var(--mono);
-    font-size: .74rem;
-    color: var(--ink-muted);
-    line-height: 1.55;
-    margin-top: .5rem;
-    padding-left: .8rem;
-    border-left: 1px solid var(--rule);
-  }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 14px 17px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); background: var(--surface-soft); font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+    tr:last-child td { border-bottom: 0; }
+    td:first-child { font-weight: 600; }
+    td code { padding: 2px 5px; border-radius: 4px; background: var(--surface-soft); font-size: 11px; }
 
-  /* ── Layer list: numbering is inherent to the content ─────────────────── */
-  .layers { display: flex; flex-direction: column; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; margin: var(--s4) 0; }
-  .layer { background: var(--surface); padding: var(--s3) var(--s4); display: grid; grid-template-columns: auto 1fr; gap: var(--s3); align-items: start; }
-  .layer .lnum {
-    font-family: var(--mono);
-    font-size: .7rem;
-    font-weight: 600;
-    letter-spacing: .06em;
-    color: var(--accent-ink);
-    background: var(--accent-soft);
-    border-radius: 4px;
-    padding: .22rem .42rem;
-    white-space: nowrap;
-    margin-top: .12rem;
-  }
-  .layer h4 { margin: 0 0 .2rem; font-size: 1rem; }
-  .layer p { margin: 0; font-size: .92rem; color: var(--ink-soft); }
+    .metrics { display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--line); gap: 1px; }
+    .metric { padding: 22px; background: var(--surface); }
+    .metric strong { display: block; margin: 5px 0 8px; font-size: 27px; line-height: 1; letter-spacing: -.04em; }
+    .metric span { color: var(--muted); font-size: 11px; line-height: 1.4; }
+    .metric-label { color: var(--brand) !important; font: 600 10px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
 
-  /* ── Diagram ──────────────────────────────────────────────────────────── */
-  figure { margin: var(--s5) 0; }
-  figure svg { width: 100%; height: auto; display: block; }
-  figcaption {
-    font-family: var(--display);
-    font-size: .8rem;
-    color: var(--ink-muted);
-    margin-top: var(--s2);
-    text-align: center;
-  }
+    .rule-groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .rule-group { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+    .rule-group h3 { margin: 0; padding: 17px 20px; border-bottom: 1px solid var(--line); font-size: 15px; }
+    .rule-list { list-style: none; padding: 0; margin: 0; }
+    .rule-list li { display: grid; grid-template-columns: 68px 1fr; gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--line); font-size: 12px; }
+    .rule-list li:last-child { border-bottom: 0; }
+    .rule-list code { color: var(--brand); font-size: 10px; font-weight: 600; }
 
-  .svg-frame {
-    background: var(--surface);
-    border: 1px solid var(--rule);
-    border-radius: 8px;
-    padding: var(--s4) var(--s3);
-    overflow-x: auto;
-  }
+    .flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .outcome { padding: 24px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+    .outcome h3 { margin: 14px 0 6px; font-size: 16px; }
+    .outcome p { margin: 0; color: var(--muted); font-size: 13px; }
 
-  /* ── Phase list ───────────────────────────────────────────────────────── */
-  .phases { list-style: none; padding: 0; margin: var(--s4) 0; display: flex; flex-direction: column; gap: var(--s3); }
-  .phase {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: var(--s3);
-    padding-bottom: var(--s3);
-    border-bottom: 1px solid var(--rule);
-  }
-  .phase:last-child { border-bottom: none; padding-bottom: 0; }
-  .phase .pnum {
-    font-family: var(--mono);
-    font-size: .78rem;
-    font-weight: 600;
-    color: var(--ink-muted);
-    font-variant-numeric: tabular-nums;
-    padding-top: .16rem;
-  }
-  .phase h4 { margin: 0 0 .2rem; display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; }
-  .phase p { margin: 0; font-size: .93rem; color: var(--ink-soft); }
+    .timeline { list-style: none; padding: 0; margin: 0; }
+    .timeline li { display: grid; grid-template-columns: 42px 1fr auto; gap: 16px; align-items: start; padding: 17px 0; border-bottom: 1px solid var(--line); }
+    .timeline li:last-child { border-bottom: 0; }
+    .timeline .index { color: var(--muted); font: 500 11px var(--mono); }
+    .timeline strong { display: block; font-size: 14px; }
+    .timeline p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+    .state { padding: 3px 8px; border-radius: 5px; background: var(--success-soft); color: var(--success); font: 600 10px var(--mono); text-transform: uppercase; }
+    .state.next { background: #eef0ff; color: var(--brand); }
 
-  footer {
-    margin-top: var(--s7);
-    padding-top: var(--s4);
-    border-top: 1px solid var(--rule);
-    font-family: var(--display);
-    font-size: .82rem;
-    color: var(--ink-muted);
-    max-width: var(--measure);
-  }
+    .limitations { columns: 2; column-gap: 44px; padding-left: 20px; }
+    .limitations li { break-inside: avoid; margin-bottom: 14px; color: var(--muted); font-size: 14px; }
+    .limitations strong { color: var(--ink); }
 
-  @media (prefers-reduced-motion: reduce) {
-    * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
-  }
-  html { scroll-behavior: smooth; }
-  h2, h3 { scroll-margin-top: var(--s4); }
-</style>
+    .graph-shell { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden; }
+    .graph-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; padding: 16px; border-bottom: 1px solid var(--line); background: var(--surface-soft); }
+    .graph-field { display: grid; gap: 5px; }
+    .graph-field:first-child { flex: 1 1 240px; }
+    .graph-field label { color: var(--muted); font: 600 9px var(--mono); letter-spacing: .07em; text-transform: uppercase; }
+    .graph-field input, .graph-field select {
+      height: 38px;
+      min-width: 180px;
+      padding: 0 11px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface);
+      color: var(--ink);
+      font: 13px var(--sans);
+    }
+    .graph-field input { width: 100%; }
+    .graph-stats { margin-left: auto; padding-bottom: 8px; color: var(--muted); font: 11px var(--mono); }
+    .graph-stage { display: grid; grid-template-columns: minmax(0, 1fr) 270px; min-height: 560px; }
+    .graph-canvas-wrap { position: relative; min-width: 0; min-height: 560px; background: radial-gradient(circle at center, #fff 0, #fafbfe 70%); }
+    #ast-graph { position: relative; display: block; width: 100%; height: 560px; overflow: hidden; cursor: grab; touch-action: none; }
+    #ast-graph:active { cursor: grabbing; }
+    .graph-scene { position: absolute; inset: 0; transform-origin: 0 0; }
+    .graph-edge { position: absolute; height: 2px; transform-origin: 0 50%; background: #c3cad6; opacity: .68; pointer-events: none; }
+    .graph-edge.active { height: 3px; background: var(--brand); opacity: .9; }
+    .graph-edge.token { background: var(--success); }
+    .graph-node {
+      position: absolute;
+      width: 112px;
+      height: 34px;
+      padding: 0 9px;
+      border: 1px solid #cfd5e1;
+      border-radius: 7px;
+      background: white;
+      color: var(--ink);
+      box-shadow: 0 3px 10px -7px rgba(17,24,39,.35);
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+    }
+    .graph-node.token { width: 158px; height: 30px; border-color: #b9dfcf; background: #f4fbf7; color: #116747; }
+    .graph-node.selected, .graph-node.hovered, .graph-node.match { border-color: var(--brand); box-shadow: 0 0 0 4px rgba(68,87,217,.11); }
+    .graph-node.selected { background: var(--ink); border-color: var(--ink); color: white; }
+    .graph-node.token.selected, .graph-node.token.hovered { background: #e8f7ef; border-color: var(--success); color: #116747; box-shadow: 0 0 0 4px rgba(22,128,91,.1); }
+    .graph-node-label {
+      display: block;
+      overflow: hidden;
+      color: inherit;
+      font: 500 11px var(--sans);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .graph-edge.dependency { background: #7887df; }
+    .graph-edge.dependent { background: #9ba6b8; }
+    .graph-branch-label { position: absolute; transform: translate(-50%, -50%); color: var(--muted); font: 600 9px var(--mono); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; pointer-events: none; }
+    .graph-legend { position: absolute; left: 14px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 12px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 7px; background: rgba(255,255,255,.9); color: var(--muted); font-size: 10px; }
+    .legend-item { display: flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--brand); }
+    .legend-dot.token { background: var(--success); }
+    .legend-line { width: 14px; border-top: 1px solid #9ba6b8; }
+    .graph-detail { padding: 22px; border-left: 1px solid var(--line); }
+    .graph-detail .eyebrow { margin-bottom: 10px; }
+    .graph-detail h3 { margin-bottom: 5px; font-size: 19px; }
+    .graph-detail > p { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 19px 0; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--line); }
+    .detail-stat { padding: 11px; background: var(--surface); }
+    .detail-stat strong { display: block; font-size: 17px; }
+    .detail-stat span { color: var(--muted); font-size: 10px; }
+    .detail-block { padding: 14px 0; border-top: 1px solid var(--line); }
+    .detail-block strong { display: block; margin-bottom: 6px; font-size: 11px; }
+    .detail-block p { margin: 0; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+    .detail-empty { color: var(--muted); font-size: 13px; }
 
-<div class="page">
+    .run-card {
+      display: grid;
+      grid-template-columns: .75fr 1.25fr;
+      gap: 48px;
+      align-items: center;
+      padding: 42px;
+      border-radius: 16px;
+      background: var(--ink);
+      color: white;
+    }
+    .run-card h2 { font-size: 30px; }
+    .run-card p { margin-bottom: 0; color: #aeb7c7; }
+    .command { position: relative; }
+    .command pre { min-height: auto; border: 1px solid #303746; border-radius: 9px; background: #0d1118; padding-right: 78px; }
+    .copy {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      padding: 6px 9px;
+      border: 1px solid #3b4352;
+      border-radius: 6px;
+      background: #202632;
+      color: #d8deea;
+      font: 11px var(--mono);
+      cursor: pointer;
+    }
 
-  <nav class="rail" aria-label="Contents">
-    <p class="eyebrow">Contents</p>
-    <ol>
-      <li><a href="#problem"><span class="num">01</span><span>The reframe</span></a></li>
-      <li><a href="#scope"><span class="num">02</span><span>What it decides</span></a></li>
-      <li><a href="#architecture"><span class="num">03</span><span>Architecture</span></a></li>
-      <li><a href="#grounding"><span class="num">04</span><span>Grounding</span></a></li>
-      <li><a href="#checks"><span class="num">05</span><span>The three checks</span></a></li>
-      <li><a href="#rulebook"><span class="num">06</span><span>Rulebook</span></a></li>
-      <li><a href="#routing"><span class="num">07</span><span>Routing</span></a></li>
-      <li><a href="#surfaces"><span class="num">08</span><span>Surfaces</span></a></li>
-      <li><a href="#measurement"><span class="num">09</span><span>Measurement</span></a></li>
-      <li><a href="#caught"><span class="num">10</span><span>What evals caught</span></a></li>
-      <li><a href="#plan"><span class="num">11</span><span>Implementation plan</span></a></li>
-      <li><a href="#buildbuy"><span class="num">12</span><span>Build vs buy</span></a></li>
-      <li><a href="#limits"><span class="num">13</span><span>Limitations</span></a></li>
-    </ol>
-  </nav>
+    footer { padding: 36px 0 52px; color: var(--muted); font-size: 13px; }
+    footer .shell { display: flex; justify-content: space-between; gap: 20px; }
 
-  <main>
+    @media (max-width: 800px) {
+      nav { display: none; }
+      .hero { grid-template-columns: 1fr; gap: 52px; padding: 68px 0 76px; }
+      .steps, .demo-grid, .principles, .run-card, .split, .rule-groups, .flow { grid-template-columns: 1fr; }
+      .pipeline { grid-template-columns: 1fr 1fr; }
+      .layer-card::after { display: none; }
+      .metrics { grid-template-columns: 1fr 1fr; }
+      .graph-stage { grid-template-columns: 1fr; }
+      .graph-detail { border-left: 0; border-top: 1px solid var(--line); }
+      .run-card { padding: 28px; gap: 26px; }
+      section { padding: 68px 0; }
+    }
 
-    <header class="masthead">
-      <p class="eyebrow">Proof of concept · Design systems</p>
-      <h1>Blade PR Review Agent</h1>
-      <p class="lede">
-        An architectural reviewer for Blade component and property PRs. It decides whether a
-        change was <em>built correctly</em> — and defers to a human on everything else.
-      </p>
-      <p class="thesis">
-        The design-systems reviewer stops being the bottleneck and becomes the author of a
-        machine-enforceable rulebook. Every verdict cites a rule; every rule cites where in
-        the Blade repo it was agreed.
-      </p>
-      <div class="meta-strip">
-        <span><b>Grounded on</b> razorpay/blade @ 4c07772</span>
-        <span><b>94</b> components</span>
-        <span><b>2,146</b> tokens</span>
-        <span><b>844</b> cascade edges</span>
-        <span><b>46</b> eval cases</span>
-        <span><b>22</b> unit tests</span>
-      </div>
-    </header>
+    @media (max-width: 480px) {
+      .shell { width: min(100% - 28px, 1120px); }
+      .review-body, .step { padding: 20px; }
+      .confidence { display: none; }
+      .review-meta, footer .shell { flex-direction: column; }
+      h1 { font-size: 42px; }
+      .pipeline, .metrics { grid-template-columns: 1fr; }
+      .limitations { columns: 1; }
+      .timeline li { grid-template-columns: 32px 1fr; }
+      .timeline .state { grid-column: 2; width: max-content; }
+      .graph-stats { width: 100%; margin-left: 0; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <header class="shell topbar">
+    <div class="brand"><span class="mark">B</span> Blade Review</div>
+    <nav aria-label="Main navigation">
+      <a href="#architecture">Architecture</a>
+      <a href="#graph">Graph</a>
+      <a href="#checks">Checks</a>
+      <a href="#evidence">Evidence</a>
+      <a href="#run">Run it</a>
+    </nav>
+  </header>
 
-    <h2 id="problem">01 · The reframe</h2>
-
-    <p>
-      Design system teams have shifted from creators to checkers. Designers now raise
-      component and property PRs directly, which is the right direction, but one
-      design-systems person cannot meaningfully review PRs from 60+ designers — and most
-      designers have no reason to know how to architect a new property the right way.
-    </p>
-
-    <p>
-      The instinct is to build a reviewer that reads the diff and gives an opinion. At
-      Razorpay's scale that fails on questions any reviewer will ask: the verdicts are
-      non-deterministic, there is no audit trail, the model's knowledge of Blade is frozen at
-      training time, and there is no way to know whether it is actually right.
-    </p>
-
-    <p>
-      So the design starts somewhere else. The agent does not <em>have</em> opinions about
-      Blade; it <em>applies</em> a rulebook the design-systems team owns, against a knowledge
-      graph extracted from Blade's own source. That is what makes it scale: one person cannot
-      review 60 designers' PRs, but one person can maintain rules a system applies to all of
-      them, consistently, with every verdict traceable.
-    </p>
-
-    <h2 id="scope">02 · What it decides, and what it refuses to</h2>
-
-    <p>
-      There are two lenses on any component PR, and conflating them is how these tools lose
-      trust. The agent owns exactly one.
-    </p>
-
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>Lens</th><th>Question</th><th>Owner</th></tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>Subjective</strong></td>
-            <td>Does this still feel like a Razorpay button? Does it belong in our design language?</td>
-            <td><span class="chip chip-accent">Human</span></td>
-          </tr>
-          <tr>
-            <td><strong>Objective</strong></td>
-            <td>Assuming the requirement is valid, has it been built correctly?</td>
-            <td><span class="chip chip-pass">Agent</span></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <p>
-      The system prompt states this boundary explicitly: if a change is architecturally sound
-      but the model has an aesthetic opinion about it, the verdict is <em>correct</em>. The
-      agent is not a taste engine and is instructed not to behave like one.
-    </p>
-
-    <h2 id="architecture">03 · Architecture</h2>
-
-    <p>
-      Four layers, each one narrowing what the next has to handle. The ordering is the whole
-      design: everything mechanically decidable is decided mechanically, so the model only
-      ever sees the residue that genuinely requires judgment.
-    </p>
-
-    <figure class="bleed">
-      <div class="svg-frame">
-        <svg viewBox="0 0 860 320" role="img" aria-labelledby="pipe-title pipe-desc">
-          <title id="pipe-title">The four-layer review pipeline</title>
-          <desc id="pipe-desc">
-            Blade source is extracted into a knowledge graph. A proposed change passes through
-            deterministic checks, then a single model judgment call on what remains, then
-            routing into pass, fail, or defer.
-          </desc>
-
-          <defs>
-            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-              <path d="M0 0 L10 5 L0 10 z" fill="var(--rule-strong)"/>
-            </marker>
-          </defs>
-
-          <g font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-muted)" letter-spacing="1">
-            <text x="20" y="26">LAYER 0 · PER RELEASE</text>
-            <text x="20" y="140">LAYER 1 · PER PR</text>
-            <text x="330" y="140">LAYER 2</text>
-            <text x="600" y="140">LAYER 3</text>
-          </g>
-
-          <!-- Layer 0 -->
-          <rect x="20" y="38" width="250" height="62" rx="7" fill="var(--surface-sunk)" stroke="var(--rule-strong)"/>
-          <text x="36" y="62" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="var(--ink)">Blade source → AST</text>
-          <text x="36" y="82" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-muted)">2,146 tokens · 94 components</text>
-
-          <rect x="300" y="38" width="250" height="62" rx="7" fill="var(--accent-soft)" stroke="var(--accent)"/>
-          <text x="316" y="62" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="var(--ink)">Knowledge graph</text>
-          <text x="316" y="82" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--accent-ink)">844 token→component edges</text>
-
-          <rect x="580" y="38" width="260" height="62" rx="7" fill="var(--surface-sunk)" stroke="var(--rule-strong)"/>
-          <text x="596" y="62" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="var(--ink)">Rulebook</text>
-          <text x="596" y="82" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-muted)">15 rules, each citing an RFC</text>
-
-          <line x1="270" y1="69" x2="296" y2="69" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#ar)"/>
-          <line x1="550" y1="69" x2="576" y2="69" stroke="var(--rule-strong)" stroke-width="1.5" stroke-dasharray="3 3"/>
-
-          <!-- feed down -->
-          <path d="M425 100 L425 118 L155 118 L155 150" fill="none" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#ar)"/>
-          <path d="M425 100 L425 118 L430 118 L430 150" fill="none" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#ar)"/>
-
-          <!-- Layer 1 -->
-          <rect x="20" y="152" width="270" height="86" rx="7" fill="var(--surface)" stroke="var(--blocker)" stroke-width="1.5"/>
-          <text x="36" y="176" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="var(--ink)">Deterministic checks</text>
-          <text x="36" y="196" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-muted)">literals · duplicates · naming</text>
-          <text x="36" y="211" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-muted)">cascade · parity · variant axes</text>
-          <text x="36" y="229" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--blocker)">~9ms · zero cost · zero variance</text>
-
-          <!-- Layer 2 -->
-          <rect x="330" y="152" width="240" height="86" rx="7" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.5" stroke-dasharray="5 3"/>
-          <text x="346" y="176" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="var(--ink)">Model judgment</text>
-          <text x="346" y="196" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-muted)">one structured call</text>
-          <text x="346" y="211" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-muted)">schema + grounding validated</text>
-          <text x="346" y="229" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--warn)">~3.4k context tokens</text>
-
-          <!-- Layer 3 -->
-          <rect x="610" y="152" width="230" height="86" rx="7" fill="var(--surface)" stroke="var(--rule-strong)"/>
-          <text x="626" y="176" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="600" fill="var(--ink)">Routing</text>
-          <text x="626" y="198" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--pass)">pass</text>
-          <text x="626" y="213" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--blocker)">fail + suggestion block</text>
-          <text x="626" y="228" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--warn)">defer to human</text>
-
-          <line x1="290" y1="195" x2="326" y2="195" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#ar)"/>
-          <line x1="570" y1="195" x2="606" y2="195" stroke="var(--rule-strong)" stroke-width="1.5" marker-end="url(#ar)"/>
-
-          <text x="292" y="188" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--ink-muted)">residue only</text>
-
-          <!-- proven blockers bypass the model -->
-          <path d="M155 238 L155 275 L725 275 L725 242" fill="none" stroke="var(--blocker)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ar)"/>
-          <text x="330" y="292" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--blocker)">a proven blocker cannot be approved away by the model</text>
-        </svg>
-      </div>
-      <figcaption>Extraction runs per Blade release; layers 1–3 run per PR.</figcaption>
-    </figure>
-
-    <div class="layers">
-      <div class="layer">
-        <span class="lnum">L0</span>
-        <div>
-          <h4>Extraction</h4>
-          <p>Parses Blade with the TypeScript compiler API into a typed graph: every token with its literal value, every component's prop unions, and the token→component edges. Regenerated per release, so the agent is never stale and no Blade fact is ever hand-written into a prompt.</p>
+  <main class="shell">
+    <div class="hero">
+      <div>
+        <p class="eyebrow">Design-system code review</p>
+        <h1>Catch the wrong approach before it ships.</h1>
+        <p class="hero-copy">Blade Review checks whether a component change follows the system’s existing tokens, APIs, and architecture. Clear issue, clear reason, clear next step.</p>
+        <div class="actions">
+          <a class="button primary" href="#example">See an example</a>
+          <a class="button" href="#run">Run the CLI</a>
         </div>
       </div>
-      <div class="layer">
-        <span class="lnum">L1</span>
-        <div>
-          <h4>Deterministic checks</h4>
-          <p>Decides everything mechanically decidable. Exact, free, and identical on every run — which is also what makes the cost story work, since the model never sees what this layer already settled.</p>
+
+      <article class="review-card" aria-label="Example review result">
+        <div class="window-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="window-label">blade review</span></div>
+        <div class="review-body">
+          <div class="status"><span class="status-icon">×</span><strong>Change needs work</strong><span class="confidence">95% confidence</span></div>
+          <p class="summary">Two existing Blade rules are being broken.</p>
+          <div class="finding">
+            <div class="finding-head"><span class="tag danger">Blocker</span><span class="rule">REUSE-003</span></div>
+            <p><strong>Button already has a tertiary variant.</strong><br>Reuse it instead of creating another one.</p>
+          </div>
+          <div class="finding">
+            <div class="finding-head"><span class="tag proven">Proven</span><span class="rule">ENC-001</span></div>
+            <p><strong>#0A8000 is a hard-coded colour.</strong><br>Use a Blade token, or add a local token first.</p>
+          </div>
+          <div class="review-meta"><span>7 ms</span><span>No API key required</span></div>
+        </div>
+      </article>
+    </div>
+
+    <section id="purpose">
+      <div class="section-head">
+        <p class="eyebrow">The reframe</p>
+        <h2>Turn one reviewer’s judgment into a system.</h2>
+        <p>One design-systems specialist cannot manually review work from 60+ designers. Instead, they author a rulebook the reviewer can enforce consistently.</p>
+      </div>
+      <div class="split">
+        <article class="info-card highlight"><h3>The agent decides implementation</h3><p>Did the change reuse existing APIs? Are values encoded as tokens? Does it accidentally affect other components? Is web/native parity preserved?</p></article>
+        <article class="info-card"><h3>Humans decide design direction</h3><p>Should this feature exist? Does it belong in Razorpay’s design language? Is the requirement right? Those remain product and design decisions.</p></article>
+      </div>
+    </section>
+
+    <section id="how">
+      <div class="section-head">
+        <p class="eyebrow">How it works</p>
+        <h2>Three steps, one useful answer.</h2>
+        <p>The reviewer combines exact code checks with model judgment only where judgment is actually needed.</p>
+      </div>
+      <div class="steps">
+        <article class="step"><span class="step-number">01</span><h3>Read the change</h3><p>It reads your intent or Git diff and finds the components, props, tokens, and values you changed.</p></article>
+        <article class="step"><span class="step-number">02</span><h3>Check Blade</h3><p>It compares the change with Blade’s real component APIs, token graph, and written rules.</p></article>
+        <article class="step"><span class="step-number">03</span><h3>Give a verdict</h3><p>You get one of three answers: correct, needs work, or needs a human reviewer.</p></article>
+      </div>
+    </section>
+
+    <section id="architecture">
+      <div class="section-head">
+        <p class="eyebrow">Architecture</p>
+        <h2>Most of the answer does not need a model.</h2>
+        <p>The pipeline separates facts from judgment. Each layer has one job, and later layers cannot erase evidence produced earlier.</p>
+      </div>
+      <div class="pipeline">
+        <article class="layer-card"><span class="layer-id">L0</span><h3>Extract</h3><p>Parse Blade source, diff-added JSX, and changed snapshots into typed facts.</p></article>
+        <article class="layer-card"><span class="layer-id">L1A</span><h3>Prove</h3><p>Run exact checks for literals, duplicates, variants, naming, parity, and cascade.</p></article>
+        <article class="layer-card"><span class="layer-id">L1B</span><h3>Structure</h3><p>Turn an added JSX subtree into an evidence-backed plan using existing Blade components.</p></article>
+        <article class="layer-card"><span class="layer-id">L2</span><h3>Judge</h3><p>Send only unresolved questions and relevant context to one model call.</p></article>
+        <article class="layer-card"><span class="layer-id">L3</span><h3>Route</h3><p>Return correct, needs work, or needs human. Proven blockers always win.</p></article>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Question</th><th>Prompt the whole diff</th><th>Blade Review</th></tr></thead>
+          <tbody>
+            <tr><td>Blade knowledge</td><td>Frozen in model training</td><td>Release graph for intent; base/head graphs in CI</td></tr>
+            <tr><td>Cascade claims</td><td>Recalled and uncertain</td><td>Computed from the AST graph</td></tr>
+            <tr><td>UI reuse</td><td>Guessed from names or pixels</td><td>Mapped from JSX structure to verified Blade primitives</td></tr>
+            <tr><td>Repeatability</td><td>May vary between runs</td><td>Proven checks are identical</td></tr>
+            <tr><td>Audit trail</td><td>Free-form explanation</td><td>Rule IDs with repo sources</td></tr>
+            <tr><td>Context cost</td><td>Potentially the whole repository</td><td>About 3k focused tokens</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="grounding">
+      <div class="section-head">
+        <p class="eyebrow">Grounded on real Blade</p>
+        <h2>The reviewer knows the system because it reads it.</h2>
+        <p>The TypeScript extractor builds a versioned knowledge graph. Facts about Blade are data, not prompt text or model memory.</p>
+      </div>
+      <div class="metrics">
+        <div class="metric"><span class="metric-label">Components</span><strong>94</strong><span>with prop unions extracted</span></div>
+        <div class="metric"><span class="metric-label">Tokens</span><strong>2,146</strong><span>global, theme, and component</span></div>
+        <div class="metric"><span class="metric-label">Edges</span><strong>844</strong><span>token-to-component links</span></div>
+        <div class="metric"><span class="metric-label">Docs</span><strong>64</strong><span>RFCs and decision records</span></div>
+        <div class="metric"><span class="metric-label">Extraction</span><strong>2.1s</strong><span>full repository, cached as JSON</span></div>
+      </div>
+      <div class="split" style="margin-top:24px">
+        <article class="info-card"><h3>Intent-time review</h3><p>The CLI uses the current release graph, so a designer can validate an approach before writing a PR.</p></article>
+        <article class="info-card"><h3>PR review</h3><p>CI compares base and head graphs: prior-art checks use the base, while final-state and cascade checks use the PR head.</p></article>
+      </div>
+    </section>
+
+    <section id="graph">
+      <div class="section-head">
+        <p class="eyebrow">Explore the AST graph</p>
+        <h2>See how Blade is connected.</h2>
+        <p>Choose any of the 94 extracted components as the root. Its dependencies, dependants, and tokens are arranged into clear branches from the AST graph.</p>
+      </div>
+      <div class="graph-shell">
+        <div class="graph-toolbar">
+          <div class="graph-field"><label for="graph-search">Find a component</label><input id="graph-search" type="search" placeholder="Try Button, Card, or Input" autocomplete="off"></div>
+          <div class="graph-field"><label for="graph-mode">Tree view</label><select id="graph-mode"><option value="components">Component dependency tree</option><option value="tokens">Token usage tree</option><option value="both">Complete local tree</option></select></div>
+          <div class="graph-stats" id="graph-stats" aria-live="polite">Loading graph…</div>
+        </div>
+        <div class="graph-stage">
+          <div class="graph-canvas-wrap">
+            <div id="ast-graph" role="img" aria-label="Interactive graph of Blade components and their extracted relationships"><div class="graph-scene" id="graph-scene"></div></div>
+            <div class="graph-legend" aria-hidden="true"><span class="legend-item"><i class="legend-dot"></i>Component</span><span class="legend-item"><i class="legend-dot token"></i>Token</span><span class="legend-item"><i class="legend-line"></i>Direct AST relationship</span></div>
+          </div>
+          <aside class="graph-detail" id="graph-detail" aria-live="polite"><p class="detail-empty">Select a component to inspect its AST metadata and local relationships.</p></aside>
         </div>
       </div>
-      <div class="layer">
-        <span class="lnum">L2</span>
-        <div>
-          <h4>Judgment</h4>
-          <p>One structured call with a retrieved context bundle. The validator rejects any rule id the model invents and drops any component it hallucinates. Not an agent loop — control flow stays in TypeScript where it can be read, tested and diffed.</p>
+    </section>
+
+    <section id="example">
+      <div class="section-head">
+        <p class="eyebrow">Code review example</p>
+        <h2>It reviews code you already wrote.</h2>
+        <p>Pass the CLI a Git diff. It focuses on added and removed lines, then explains the architectural impact in plain language.</p>
+      </div>
+      <div class="demo-grid">
+        <article class="panel">
+          <div class="panel-title">Your diff</div>
+          <pre><span class="minus">- backgroundColor: tokens.surface.action;</span>
+<span class="plus">+ backgroundColor: '#0A8000';</span>
+
+<span class="plus">+ variant: 'tertiary';</span></pre>
+        </article>
+        <article class="panel">
+          <div class="panel-title">Blade Review</div>
+          <div class="answer">
+            <div class="answer-row"><span class="answer-icon">01</span><div><strong>Reuse the existing variant</strong><span>Button already supports tertiary.</span></div></div>
+            <div class="answer-row"><span class="answer-icon">02</span><div><strong>Remove the literal colour</strong><span>Visual values must come from tokens.</span></div></div>
+            <div class="answer-row"><span class="answer-icon">03</span><div><strong>Check the wider impact</strong><span>Button changes can affect 30 connected components.</span></div></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="checks">
+      <div class="section-head">
+        <p class="eyebrow">The five checks</p>
+        <h2>Small set, high leverage.</h2>
+        <p>The POC focuses on architectural mistakes that are costly to discover late and concrete enough to verify.</p>
+      </div>
+      <div class="steps">
+        <article class="step"><span class="step-number">Encoding</span><h3>Is it represented correctly?</h3><p>Find hard-coded colours and dimensions, invalid token names, misplaced component tokens, and switch-based variant styling.</p></article>
+        <article class="step"><span class="step-number">Cascading</span><h3>What else will change?</h3><p>Trace shared tokens and base components to every consumer. Pair web and native changes by component and matching file surface.</p></article>
+        <article class="step"><span class="step-number">Reuse</span><h3>Does Blade already have it?</h3><p>Match against base-commit tokens and variant axes. For a new component, compare its extracted prop surface with existing components.</p></article>
+        <article class="step"><span class="step-number">Composition</span><h3>Can existing components build it?</h3><p>Read the added JSX tree, map raw containers, text, controls, lists, and tables to verified Blade primitives, and report uncovered elements.</p></article>
+        <article class="step"><span class="step-number">Render</span><h3>What does it resolve to?</h3><p>Inspect changed snapshots for off-scale values and paired web/native output that resolves differently.</p></article>
+      </div>
+      <div class="info-card" style="margin-top:20px">
+        <h3>Structure reuse, without visual guessing</h3>
+        <p><code>section &gt; h3 + p + button</code> becomes <code>Box + Typography + Button</code> only when those components exist in the extracted Blade graph. The recommendation remains advisory because matching markup does not prove matching behaviour.</p>
+      </div>
+      <div class="info-card" style="margin-top:20px">
+        <h3>A real cascade example</h3>
+        <p>Changing <code>border.radius.medium</code> from 12 to 8 to “fix Card” would also reshape Button, Chip, Alert, and 53 other consumers. Blade Review names those consumers and recommends a Card-local token instead.</p>
+      </div>
+    </section>
+
+    <section id="rulebook">
+      <div class="section-head">
+        <p class="eyebrow">The rulebook is the product</p>
+        <h2>Every verdict points back to an agreed rule.</h2>
+        <p>Rules carry an ID, severity, plain statement, examples, and a source in Blade’s RFCs or contributor guidance. A rule with no source is a rule nobody agreed to.</p>
+      </div>
+      <div class="rule-groups">
+        <article class="rule-group"><h3>Correct encoding</h3><ul class="rule-list">
+          <li><code>ENC-001</code><span>No hard-coded literal values</span></li>
+          <li><code>ENC-002</code><span>Config-driven variant styling</span></li>
+          <li><code>ENC-003</code><span>Object.Base.Modifier naming</span></li>
+          <li><code>ENC-004</code><span>Specificity over flexibility</span></li>
+          <li><code>ENC-005</code><span>Tokens live with components</span></li>
+        </ul></article>
+        <article class="rule-group"><h3>Correct cascading</h3><ul class="rule-list">
+          <li><code>CAS-001</code><span>Shared tokens affect all consumers</span></li>
+          <li><code>CAS-002</code><span>Alias before diverging</span></li>
+          <li><code>CAS-003</code><span>Base changes reach composites</span></li>
+          <li><code>CAS-004</code><span>Web/native parity</span></li>
+        </ul></article>
+        <article class="rule-group"><h3>Reuse first</h3><ul class="rule-list">
+          <li><code>REUSE-001</code><span>No duplicate token values</span></li>
+          <li><code>REUSE-002</code><span>Start local, then promote</span></li>
+          <li><code>REUSE-003</code><span>Extend existing variant axes</span></li>
+          <li><code>REUSE-004</code><span>No duplicate components</span></li>
+          <li><code>REUSE-005</code><span>Consistent prop names</span></li>
+        </ul></article>
+        <article class="rule-group"><h3>Correct composition</h3><ul class="rule-list">
+          <li><code>COMP-001</code><span>Prefer Blade primitives</span></li>
+          <li><code>COMP-002</code><span>No inline style objects</span></li>
+          <li><code>COMP-003</code><span>Reuse covered UI structures</span></li>
+          <li><code>COMP-004</code><span>No illegal interactive nesting</span></li>
+          <li><code>COMP-005</code><span>Use declared variant values</span></li>
+        </ul></article>
+        <article class="rule-group"><h3>Correct render output</h3><ul class="rule-list">
+          <li><code>REND-001</code><span>Rendered values stay on scale</span></li>
+          <li><code>REND-002</code><span>Web/native output stays aligned</span></li>
+        </ul></article>
+      </div>
+    </section>
+
+    <section>
+      <div class="principles">
+        <div class="principles-copy">
+          <p class="eyebrow">Why trust it</p>
+          <h2>Facts first. Judgment second.</h2>
+          <p>The model cannot overrule a proven code issue. When the evidence is unclear, the tool asks for a human instead of guessing.</p>
+        </div>
+        <div class="principle-list">
+          <div class="principle"><h3>Grounded in Blade</h3><p>Component APIs and token relationships are extracted from source code.</p></div>
+          <div class="principle"><h3>Every issue cites a rule</h3><p>A reviewer can see what failed and where the rule came from.</p></div>
+          <div class="principle"><h3>Safe by default</h3><p>Uncertain approvals become human reviews, never silent passes.</p></div>
+          <div class="principle"><h3>Provider flexible</h3><p>Run offline, with Anthropic, or through any model available on OpenRouter.</p></div>
         </div>
       </div>
-      <div class="layer">
-        <span class="lnum">L3</span>
-        <div>
-          <h4>Routing</h4>
-          <p>Three outcomes, not two. Deliberately asymmetric: a proven blocker cannot be approved away, and an under-confident approval becomes a deferral rather than an approval.</p>
+    </section>
+
+    <section id="routing">
+      <div class="section-head">
+        <p class="eyebrow">Routing</p>
+        <h2>Three outcomes, not a forced yes or no.</h2>
+        <p>The system is deliberately asymmetric: a false rejection costs one conversation; a false approval can silently damage the design system.</p>
+      </div>
+      <div class="flow">
+        <article class="outcome"><span class="tag proven">Correct</span><h3>Pass quietly</h3><p>No blocking issue and enough confidence. CI succeeds without adding review noise.</p></article>
+        <article class="outcome"><span class="tag danger">Incorrect</span><h3>Block with a fix</h3><p>A proven violation requests changes and can include a GitHub suggestion block.</p></article>
+        <article class="outcome"><span class="tag" style="color:#a8640a;background:#fff6e8">Needs human</span><h3>Defer safely</h3><p>Ambiguous cases stay neutral and request the design-systems team.</p></article>
+      </div>
+      <div class="split" style="margin-top:24px">
+        <article class="info-card"><h3>CLI before the PR</h3><p>Review an idea or a local patch while the implementation is still cheap to change.</p></article>
+        <article class="info-card"><h3>CI on the PR</h3><p>The same <code>review(change) → Verdict</code> engine posts a GitHub review, check result, and applicable fix.</p></article>
+      </div>
+    </section>
+
+    <section id="evidence">
+      <div class="section-head">
+        <p class="eyebrow">Measurement</p>
+        <h2>Safety is measured, not claimed.</h2>
+        <p>The eval suite compares the deterministic floor with the full judgment layer. False approvals lead because they are the most expensive failure.</p>
+      </div>
+      <div class="metrics">
+        <div class="metric"><span class="metric-label">False approve</span><strong>0.0%</strong><span>0 of 53 reject cases</span></div>
+        <div class="metric"><span class="metric-label">False reject</span><strong>0.0%</strong><span>0 of 16 positive controls rejected</span></div>
+        <div class="metric"><span class="metric-label">Accuracy</span><strong>78.7%</strong><span>75 evaluated changes</span></div>
+        <div class="metric"><span class="metric-label">Correct approvals</span><strong>0.0%</strong><span>all positive controls defer offline</span></div>
+        <div class="metric"><span class="metric-label">Decision coverage</span><strong>70.7%</strong><span>automatic yes/no at the offline floor</span></div>
+        <div class="metric"><span class="metric-label">Rule citation</span><strong>100%</strong><span>right reason, not just status</span></div>
+        <div class="metric"><span class="metric-label">Cascade recall</span><strong>100%</strong><span>deterministic by construction</span></div>
+      </div>
+      <div class="split" style="margin-top:24px">
+        <article class="info-card"><h3>Hand-written goldens</h3><p>Realistic positive, negative, and deliberately ambiguous cases with expected verdicts, rules, and affected components.</p></article>
+        <article class="info-card"><h3>Graph-derived controls</h3><p>Known-good Blade surfaces generate labelled negative mutations and positive config/parity controls, preventing a reject-only reviewer from hiding behind class imbalance.</p></article>
+      </div>
+      <p style="margin:20px 0 0;color:var(--muted);font-size:13px">Current published numbers use the offline provider in both eval arms. The harness is ready to expose the model’s actual delta once a remote provider is configured.</p>
+    </section>
+
+    <section id="findings">
+      <div class="section-head">
+        <p class="eyebrow">What the evals caught</p>
+        <h2>The harness tests the reviewer—and the rules.</h2>
+        <p>Evaluation is not only a model score. It exposes incorrect assumptions in the policy and implementation itself.</p>
+      </div>
+      <div class="split">
+        <article class="info-card"><h3>01 · The graph corrected the reviewer</h3><p>The Button example looked like a new tertiary variant. Extraction proved that <code>variant="tertiary"</code> already exists, turning a subjective objection into an exact reuse violation.</p></article>
+        <article class="info-card"><h3>02 · A test caught a policy bug</h3><p>Positive controls prevent a reject-only system from looking accurate on a negative-heavy dataset. Deferrals are measured separately from real approvals.</p></article>
+      </div>
+    </section>
+
+    <section id="plan">
+      <div class="section-head">
+        <p class="eyebrow">Implementation plan</p>
+        <h2>The end-to-end POC is built. The next work is learning.</h2>
+        <p>The core pipeline is complete; remaining work improves the evidence base and feeds human corrections back into the system.</p>
+      </div>
+      <ol class="timeline">
+        <li><span class="index">01</span><div><strong>Extraction pipeline</strong><p>AST-based graph of tokens, components, prop unions, consumption edges, and docs.</p></div><span class="state">Done</span></li>
+        <li><span class="index">02</span><div><strong>Rulebook and deterministic checks</strong><p>Twenty-one sourced rules with exact checks for mechanically decidable cases.</p></div><span class="state">Done</span></li>
+        <li><span class="index">03</span><div><strong>Judgment and routing</strong><p>Structured output, grounding validation, provider interface, and safe three-way routing.</p></div><span class="state">Done</span></li>
+        <li><span class="index">04</span><div><strong>CLI, GitHub adapter, and evals</strong><p>Intent review, diff review, CI comments, suggestions, and a two-arm harness.</p></div><span class="state">Done</span></li>
+        <li><span class="index">05</span><div><strong>Provider flexibility</strong><p>Offline mode, Anthropic, and OpenRouter-compatible chat completion models.</p></div><span class="state">Done</span></li>
+        <li><span class="index">06</span><div><strong>Semantic UI-structure review</strong><p>Whole JSX subtrees map to verified Blade primitive compositions; component fixtures and repository-local PR CI demonstrate advisory and blocking outcomes.</p></div><span class="state">Done</span></li>
+        <li><span class="index">07</span><div><strong>Mine Blade PR history</strong><p>Use merged PRs and “changes requested” threads as real positive and negative cases.</p></div><span class="state next">Next</span></li>
+        <li><span class="index">08</span><div><strong>Override ingestion and telemetry</strong><p>Turn reviewer disagreements into new evals or rule amendments; track high-override rules.</p></div><span class="state next">Next</span></li>
+      </ol>
+    </section>
+
+    <section id="build-buy">
+      <div class="section-head">
+        <p class="eyebrow">Build versus buy</p>
+        <h2>The moat is Blade-specific knowledge, not the chat model.</h2>
+        <p>Generic review products can summarize diffs and find common bugs. They do not know Blade’s token graph, component API history, cross-platform rules, or team decisions.</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Capability</th><th>Generic reviewer</th><th>Blade Review</th></tr></thead>
+          <tbody>
+            <tr><td>General code quality</td><td>Strong</td><td>Out of scope</td></tr>
+            <tr><td>Existing variant axes</td><td>Needs repository context</td><td>Extracted and exact</td></tr>
+            <tr><td>Token cascade</td><td>Usually inferred</td><td>Computed from 844 edges</td></tr>
+            <tr><td>Blade policy</td><td>Prompted as prose</td><td>Versioned, sourced rulebook</td></tr>
+            <tr><td>Model choice</td><td>Often bundled</td><td>Replaceable: offline, Anthropic, OpenRouter</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="limits">
+      <div class="section-head">
+        <p class="eyebrow">Limitations</p>
+        <h2>What this POC does not solve yet.</h2>
+        <p>The boundaries are explicit so the next evaluation round can target them.</p>
+      </div>
+      <ul class="limitations">
+        <li><strong>Prose parsing is partly heuristic.</strong> Signals that are not backed by the graph cannot become proven blockers.</li>
+        <li><strong>Cross-file prop types are not fully resolved.</strong> Local unions and intersections are handled, but imported types need a full checker program.</li>
+        <li><strong>The model contribution is not measured in current results.</strong> Both saved eval arms ran with the offline provider.</li>
+        <li><strong>Positive controls defer offline.</strong> The offline floor never approves by design, so its current accuracy is 78.7% and correct-approval recall is reported separately as 0%.</li>
+        <li><strong>The rulebook needs team ownership.</strong> It is sourced, but production deployment starts with Blade maintainers reviewing and editing it.</li>
+        <li><strong>The graph must be refreshed.</strong> Intent review is only as current as its extracted Blade release; CI rebuilds against the PR.</li>
+        <li><strong>Rendered structure is semantic, not visual.</strong> It uses complete JSX blocks and changed snapshots, not screenshots; partial prop-only hunks and subjective visual fit still defer.</li>
+      </ul>
+    </section>
+
+    <section id="run">
+      <div class="run-card">
+        <div><p class="eyebrow">Try it locally or in CI</p><h2>Review a branch in one command.</h2><p>Describe the goal and attach a patch, or copy a case from <code>tmp/ui-cases/catalog</code> into <code>active</code> and open a PR to see the repository-local action post its review.</p></div>
+        <div class="command">
+          <pre id="command-text">npm run review -- \
+  --diff changes.patch \
+  "describe the change"</pre>
+          <button class="copy" type="button" aria-label="Copy command" onclick="copyCommand(this)">Copy</button>
         </div>
       </div>
-    </div>
-
-    <h3>Why not just prompt a model with the diff</h3>
-
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th></th><th>Prompt the diff</th><th>This design</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>Knowledge of Blade</td><td>frozen at training</td><td>re-extracted per release</td></tr>
-          <tr><td>Cascade claims</td><td>recalled, sometimes wrong</td><td>computed from the AST</td></tr>
-          <tr><td>Same PR twice</td><td>may differ</td><td>proven layer is identical</td></tr>
-          <tr><td>Audit trail</td><td>prose</td><td>rule ids with repo provenance</td></tr>
-          <tr><td>Cost per PR</td><td>whole-repo context</td><td class="num-cell">~3.4k tokens</td></tr>
-          <tr><td>“How do you know it works?”</td><td>—</td><td><code>npm run eval</code></td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h2 id="grounding">04 · Grounding on real Blade</h2>
-
-    <p>
-      Everything below was extracted from a live clone of <code>razorpay/blade</code>, not
-      hand-authored. Blade turned out to be unusually well suited to this: it already ships
-      38 per-component token files that map prop combinations to dot-notation token paths,
-      67 <code>_decisions/decisions.md</code> API documents, and an RFC that states the
-      architectural principles outright.
-    </p>
-
-    <div class="metrics">
-      <div class="metric"><span class="k">Components</span><span class="v">94</span><span class="d">with prop unions extracted</span></div>
-      <div class="metric"><span class="k">Tokens</span><span class="v">2,146</span><span class="d">524 global · 427 theme · 1,195 component</span></div>
-      <div class="metric is-accent"><span class="k">Cascade edges</span><span class="v">844</span><span class="d">token → component, all EXTRACTED</span></div>
-      <div class="metric"><span class="k">Docs indexed</span><span class="v">64</span><span class="d">RFCs and decision records</span></div>
-      <div class="metric"><span class="k">Extraction</span><span class="v">2.1s</span><span class="d">full repo, cached as JSON</span></div>
-    </div>
-
-    <h3>Two consumption patterns, both required</h3>
-
-    <p>
-      A naive extractor misses half the graph. Blade components consume tokens two different
-      ways, and only handling both makes cascade analysis correct:
-    </p>
-
-    <div class="code"><span class="c">// 1. semantic tokens, as dot-notation strings in component token files</span>
-<span class="c">//    packages/blade/src/components/Button/BaseButton/buttonTokens.ts</span>
-primary: { default: <b>'interactive.background.primary.default'</b> }
-
-<span class="c">// 2. global tokens, as member access on the theme object</span>
-<span class="c">//    packages/blade/src/components/Switch/AnimatedThumb.web.tsx</span>
-border-radius: ${makeBorderSize(<b>theme.border.radius.max</b>)};
-
-<span class="c">// 3. and the hard case — a computed index</span>
-borderRadius: theme.border.radius[<b>itemBorderRadius[size]</b>]
-<span class="c">//    recorded as `border.radius.[*]`: a change to ANY radius token can</span>
-<span class="c">//    affect this component, so the group is recorded rather than the edge dropped</span></div>
-
-    <div class="note">
-      <p>
-        <strong>On over- versus under-reporting.</strong> The wildcard case is a deliberate
-        choice. A missed consumer is a correctness failure that destroys trust the first time
-        a designer is told “this only affects Card” and it did not. A widened group is a
-        disclosure we can label. So the extractor widens, and says so.
-      </p>
-    </div>
-
-    <h2 id="checks">05 · The three checks</h2>
-
-    <h3>Correct cascading</h3>
-
-    <p>
-      This is the brief's own example, run against real Blade. A designer thinks the Card
-      corners are too round and reduces the shared radius token:
-    </p>
-
-    <div class="code">$ npm run review -- --diff radius.patch "The Card corners look too round."
-
-<span class="del">-    medium: 12,</span>
-<span class="add">+    medium: 8,</span></div>
-
-    <div class="finding proven">
-      <div class="fhead"><span class="chip chip-blocker">Blocker</span><b>CAS-001</b><span>proven by static analysis</span></div>
-      <p><code>border.radius.medium</code> is consumed by <strong>57 components</strong>. Changing its value changes all of them.</p>
-      <div class="ev">
-        Stated target: Card.<br>
-        Not stated but affected: Accordion, ActionList, Alert, AppBar, Avatar, BaseMenu, Box,
-        <strong>Button</strong>, ButtonGroup, Carousel, Charts, ChatInput, Checkbox, Chip, +43 more.
-      </div>
-    </div>
-
-    <div class="finding proven">
-      <div class="fhead"><span class="chip chip-blocker">Blocker</span><b>REUSE-001</b><span>proven by static analysis</span></div>
-      <p>The proposed value <code>8</code> is already encoded by an existing token.</p>
-      <div class="ev">
-        <code>border.radius.small</code> = 8 &nbsp;·&nbsp; tokens/global/border.ts:47<br>
-        <code>spacing.3</code> = 8 &nbsp;·&nbsp; tokens/global/spacing.ts:38
-      </div>
-    </div>
-
-    <div class="finding proven">
-      <div class="fhead"><span class="chip chip-blocker">Blocker</span><b>REUSE-002</b><span>proven by static analysis</span></div>
-      <p>A global token is being changed to serve a single component. Blade's convention is to start local and promote only once a third consumer appears.</p>
-      <div class="ev">→ <code>components/Card/cardTokens.ts</code></div>
-    </div>
-
-    <p>
-      Getting this to fire from the diff alone required real work. A diff hunk shows
-      <code>medium: 8</code> with no nesting context, so the leaf key has to be resolved back
-      to its addressable path by matching the file the edit landed in against the extracted
-      index. Without that resolution step the single most important case this tool exists to
-      catch silently passes.
-    </p>
-
-    <h3>Reuse over duplication</h3>
-
-    <p>
-      Prose intent, no diff. The agent resolves the component name against the graph, then
-      matches the proposed value against the component's real extracted union:
-    </p>
-
-    <div class="code">$ npm run review -- "add a tertiary variant to Button with a green background #0A8000"</div>
-
-    <div class="finding proven">
-      <div class="fhead"><span class="chip chip-blocker">Blocker</span><b>REUSE-003</b></div>
-      <p><code>Button</code> already accepts <code>variant="tertiary"</code>. This variant does not need to be created.</p>
-      <div class="ev">Button.variant allows: <code>primary</code>, <code>secondary</code>, <code>tertiary</code><br>Extracted from source at blade@4c07772, not recalled.</div>
-    </div>
-
-    <div class="finding proven">
-      <div class="fhead"><span class="chip chip-warn">Warning</span><b>ENC-001</b></div>
-      <p>Literal colour <code>#0a8000</code> used where a design token is required.</p>
-      <div class="ev">No existing token holds this value — a genuinely new colour still needs a token, and REUSE-002 says where it should live.</div>
-    </div>
-
-    <h3>Correct encoding</h3>
-
-    <p>
-      The tokens RFC opens by describing the pattern it was written to eliminate: variant
-      styling expressed as <code>switch</code> branches returning values. That description is
-      now a detector, and the rule cites the RFC section it came from.
-    </p>
-
-    <div class="code"><span class="c">// flagged: ENC-002 — variant styling as conditional branches</span>
-<span class="k">switch</span> (variant) {
-  <span class="k">case</span> <b>'tertiary'</b>: <span class="k">return</span> isDisabled ? <b>'light.950'</b> : <b>'light.900'</b>;
-}
-
-<span class="c">// correct: a declarative mapping in the component token file</span>
-<span class="k">const</span> buttonTokens = { base: { tertiary: { default: <b>'surface.background.gray.intense'</b> } } };</div>
-
-    <h2 id="rulebook">06 · The rulebook is the product</h2>
-
-    <p>
-      Fifteen rules across the three categories. The <code>source</code> field is required by
-      the type, because a rule with no provenance is a rule nobody agreed to. Nine are fully
-      decided by a deterministic check and never reach the model.
-    </p>
-
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>Rule</th><th>Statement</th><th>Source in repo</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><code>ENC-001</code></td><td>No hard-coded literal values</td><td>tokens RFC § Summary</td></tr>
-          <tr><td><code>ENC-002</code></td><td>Variant styling is config-driven, not conditional</td><td>tokens RFC § The current state</td></tr>
-          <tr><td><code>ENC-003</code></td><td>Token names follow <code>Object.Base.Modifier</code></td><td>tokens RFC § Creating a new token</td></tr>
-          <tr><td><code>ENC-004</code></td><td>Specificity over flexibility</td><td>tokens RFC § Principles Used</td></tr>
-          <tr><td><code>ENC-005</code></td><td>Component tokens live in the component token file</td><td>tokens RFC § Storing component tokens</td></tr>
-          <tr><td><code>CAS-001</code></td><td>Changing a shared token changes every consumer</td><td>tokens RFC § Overlapping Decisions</td></tr>
-          <tr><td><code>CAS-002</code></td><td>Alias the specific to the generic rather than diverging</td><td>tokens RFC § Overlapping Decisions</td></tr>
-          <tr><td><code>CAS-003</code></td><td>Base-component changes cascade to composites</td><td>blade/CLAUDE.md</td></tr>
-          <tr><td><code>CAS-004</code></td><td>Cross-platform parity between web and native</td><td>cross-platform TypeScript RFC</td></tr>
-          <tr><td><code>REUSE-001</code></td><td>Do not create a token duplicating an existing value</td><td>tokens RFC § Overlapping Decisions</td></tr>
-          <tr><td><code>REUSE-002</code></td><td>Start within, then promote across</td><td>tokens RFC § Principles Used</td></tr>
-          <tr><td><code>REUSE-003</code></td><td>Extend an existing variant axis before creating one</td><td>blade/CLAUDE.md</td></tr>
-          <tr><td><code>REUSE-004</code></td><td>Do not create a component duplicating an existing one</td><td>blade/CLAUDE.md</td></tr>
-          <tr><td><code>REUSE-005</code></td><td>Prop naming consistent with the system</td><td>blade/CLAUDE.md</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h2 id="routing">07 · Routing, and the asymmetry that matters</h2>
-
-    <p>
-      A false reject costs a designer one round trip. A false approve puts a wrong pattern
-      into the design system permanently and silently. The two are not symmetric, so the
-      routing is not symmetric either.
-    </p>
-
-    <ul>
-      <li>A <strong>proven blocker cannot be approved away</strong> by the model. That is the point of proving it, and it is covered by a unit test that feeds a confidently-wrong model response into a diff with a real violation.</li>
-      <li>An <strong>under-confident approval becomes a deferral</strong>, never an approval.</li>
-      <li>A <strong>provider failure degrades to <code>needs_human</code></strong>, never to <code>correct</code>, and never hard-fails the build.</li>
-      <li><strong>No findings does not mean correct.</strong> It means the deterministic layer had nothing to say, which is a different claim.</li>
-    </ul>
-
-    <p>
-      The third verdict state is what makes the tool honest. Routing to a human is a correct
-      answer, not a failure — the system prompt says so explicitly, so the model is not
-      pushed toward false confidence to look useful.
-    </p>
-
-    <h2 id="surfaces">08 · Surfaces</h2>
-
-    <p>
-      Both surfaces are roughly fifty-line adapters over one function,
-      <code>review(change) → Verdict</code>. The engine is the product; the form factor is a
-      delivery detail, which also makes the choice reversible.
-    </p>
-
-    <p>
-      The <strong>CLI</strong> works before a PR exists. That is a real product point, not a
-      demo convenience: catching a wrong approach at intent time costs a designer a
-      conversation, while catching it at review time costs them a day of work and a
-      rejection.
-    </p>
-
-    <p>
-      The <strong>CI check</strong> is where it scales to 60 designers without anyone opting
-      in. There is no separate dashboard, deliberately — reviewers already live in the PR, so
-      the PR is the interface:
-    </p>
-
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Verdict</th><th>GitHub action</th><th>Check</th></tr></thead>
-        <tbody>
-          <tr><td><span class="chip chip-pass">correct</span></td><td>Passing check, no comment — silence is the reward for doing it right</td><td class="num-cell">success</td></tr>
-          <tr><td><span class="chip chip-blocker">incorrect</span></td><td><code>REQUEST_CHANGES</code> with the fix as a <code>suggestion</code> block</td><td class="num-cell">failure</td></tr>
-          <tr><td><span class="chip chip-warn">needs_human</span></td><td>Comment + request review from the DS team, non-blocking</td><td class="num-cell">neutral</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <p>
-      Two details carry disproportionate weight. The suggestion block renders with a
-      <em>Commit suggestion</em> button, so a designer who does not know the architecture gets
-      the correct implementation applied in one click — “no, and here is the commit” rather
-      than “no, and here is why”. And a deferral is <code>neutral</code>, never
-      <code>failure</code>: a deferral that looks like a broken build teaches a team to ignore
-      the check within a week.
-    </p>
-
-    <h3>The human loop closes back into the evals</h3>
-
-    <p>
-      When the design-systems reviewer disagrees, they reply <code>/ds-agent disagree
-      &lt;reason&gt;</code> in the thread. That override is appended to
-      <code>evals/overrides.jsonl</code> and becomes either a new eval case or a rulebook
-      amendment. The reviewer still handles the uncertain cases, but their review time now
-      compounds instead of evaporating.
-    </p>
-
-    <h2 id="measurement">09 · Measurement</h2>
-
-    <p>
-      This is the part that separates a system from a demo, so it is built as a first-class
-      surface rather than a script. <code>npm run eval</code> reports two arms side by side,
-      which makes the model's contribution a number rather than a claim.
-    </p>
-
-    <div class="metrics">
-      <div class="metric is-critical"><span class="k">False approve</span><span class="v">0.0%</span><span class="d">0 of 44 changes that should be rejected</span></div>
-      <div class="metric is-critical"><span class="k">False reject</span><span class="v">0.0%</span><span class="d">0 of 2 positive controls</span></div>
-      <div class="metric"><span class="k">Verdict accuracy</span><span class="v">95.7%</span><span class="d">n = 46 cases</span></div>
-      <div class="metric"><span class="k">Rule citation</span><span class="v">100%</span><span class="d">right answer for the right reason</span></div>
-      <div class="metric is-accent"><span class="k">Cascade recall</span><span class="v">100%</span><span class="d">deterministic by construction</span></div>
-      <div class="metric"><span class="k">Deferral rate</span><span class="v">8.7%</span><span class="d">routed to a human</span></div>
-    </div>
-
-    <p>
-      Those figures are the <strong>deterministic floor</strong> — Layer 1 only, no API key,
-      no network, fully reproducible. That matters more than a higher number would: it is the
-      guaranteed behaviour of the system, and anyone can clone the repo and reproduce it
-      exactly.
-    </p>
-
-    <h3>Metrics chosen for what they catch</h3>
-
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Metric</th><th>Why it is reported</th></tr></thead>
-        <tbody>
-          <tr><td><strong>False approve rate</strong></td><td>Led with, not accuracy. The asymmetric cost is the entire argument for how routing works.</td></tr>
-          <tr><td><strong>Rule-citation accuracy</strong></td><td>Catches a reviewer that guesses “incorrect” and happens to be right. Raw accuracy hides this completely.</td></tr>
-          <tr><td><strong>Cascade recall</strong></td><td>Should be exactly 100% because it is computed, not recalled. That it <em>is</em> 100% is the evidence for splitting the architecture this way.</td></tr>
-          <tr><td><strong>Run-to-run stability</strong></td><td><code>--runs 3</code> measures flakiness directly, rather than reasoning about whether a non-deterministic reviewer can be trusted.</td></tr>
-          <tr><td><strong>Deferral rate</strong></td><td>Too high and it is useless; too low and it is overconfident. Both failure modes are invisible in accuracy.</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h3>Where the cases come from</h3>
-
-    <p>
-      Twelve hand-written goldens covering each rule category, including two positive controls
-      and one deliberately ambiguous case that <em>should</em> defer — without those, a checker
-      that rejects everything scores well. The other 34 come from a <strong>synthetic mutation
-      generator</strong> that takes real, merged, correct Blade source and corrupts it in ways
-      that map one-to-one onto rulebook violations: inline a token's value, duplicate an
-      existing token, re-propose a variant that already exists, edit <code>.web</code> without
-      <code>.native</code>.
-    </p>
-
-    <p>
-      That gives labelled negatives at zero labelling cost, with a distribution across rule
-      categories we control rather than inherit from whatever PRs happened to exist. Mining
-      Blade's real PR history — merged PRs as positives, “changes requested” PRs with the
-      maintainer's comment as negatives with free ground-truth reasoning — is the natural
-      next source, and is listed in the plan below.
-    </p>
-
-    <h2 id="caught">10 · What the eval harness caught</h2>
-
-    <p>
-      Two findings worth reporting, because they are the argument for building the harness at
-      all rather than shipping on vibes.
-    </p>
-
-    <div class="panel">
-      <p class="eyebrow">Finding 01 · the agent corrected me</p>
-      <p>
-        I hand-wrote a case asserting that adding an <code>elevation</code> prop to Card was a
-        genuinely new axis and should defer to a human. The agent returned
-        <code>incorrect</code>. It was right and I was wrong: Card already declares
-        <code>elevation?: keyof Elevation</code> at <code>Card.tsx:85</code>, so the correct
-        verdict is REUSE-003, extend the existing prop.
-      </p>
-      <p>
-        The ground truth was corrected in the case file with the reasoning recorded. This is
-        the clearest demonstration I have that grounding verdicts in extracted source beats
-        recollection — including my own.
-      </p>
-    </div>
-
-    <div class="panel">
-      <p class="eyebrow">Finding 02 · the harness caught my own policy bug</p>
-      <p>
-        The design has a safety rule: signals derived from prose are heuristic, so they cap at
-        <em>warning</em> and never block a PR. The eval run showed that rule was too blunt —
-        it was downgrading findings whose evidence was graph-proven, and the reuse category
-        sat at 62.5%.
-      </p>
-      <p>
-        When the graph proves that <code>Button.variant</code> already accepts
-        <code>"secondary"</code>, only the <em>wish</em> came from prose; the component and the
-        value are both exact matches against unions read off the AST. The fix was to the
-        policy, not the test. Reuse went to 100% and overall accuracy from 75.6% to 95.7%.
-      </p>
-      <p>
-        Tightening that also introduced two false rejects — a prop mentioned in passing
-        (“to control internal padding”) and a negation (“no new props”) were both being read as
-        additive intent. Both are now unit-tested regressions.
-      </p>
-    </div>
-
-    <h2 id="plan">11 · Implementation plan</h2>
-
-    <p>
-      Phases 1–5 are built and running. Phases 6–8 are what I would do next, in priority
-      order.
-    </p>
-
-    <ol class="phases">
-      <li class="phase">
-        <span class="pnum">01</span>
-        <div>
-          <h4>Extraction pipeline <span class="chip chip-pass">done</span></h4>
-          <p>TypeScript compiler API over a Blade checkout. Token index with literal values, component API index with prop unions, and both token-consumption patterns. Cached as a JSON artifact so a CI run costs one file read.</p>
-        </div>
-      </li>
-      <li class="phase">
-        <span class="pnum">02</span>
-        <div>
-          <h4>Rulebook <span class="chip chip-pass">done</span></h4>
-          <p>Fifteen rules distilled from the tokens RFC, the cross-platform RFC and Blade's contributor guidance, each with a required source field and a flag for whether a deterministic check fully covers it.</p>
-        </div>
-      </li>
-      <li class="phase">
-        <span class="pnum">03</span>
-        <div>
-          <h4>Deterministic checks <span class="chip chip-pass">done</span></h4>
-          <p>Eleven checks over a change model that normalises prose intent and unified diffs into structured signals, with the prose/diff provenance boundary enforced throughout.</p>
-        </div>
-      </li>
-      <li class="phase">
-        <span class="pnum">04</span>
-        <div>
-          <h4>Judgment and routing <span class="chip chip-pass">done</span></h4>
-          <p>Retrieval bundle, provider interface with an Anthropic implementation and a deterministic offline provider, schema and grounding validation, and the asymmetric routing rules. 22 unit tests cover the routing invariants.</p>
-        </div>
-      </li>
-      <li class="phase">
-        <span class="pnum">05</span>
-        <div>
-          <h4>Surfaces and evals <span class="chip chip-pass">done</span></h4>
-          <p>CLI, GitHub adapter with suggestion blocks, a workflow that rebuilds the graph from the PR's own checkout, and the two-arm eval harness with the mutation generator.</p>
-        </div>
-      </li>
-      <li class="phase">
-        <span class="pnum">06</span>
-        <div>
-          <h4>Mine Blade's PR history <span class="chip chip-accent">next</span></h4>
-          <p>Merged designer PRs as positives; “changes requested” PRs with maintainer comments as negatives carrying free ground-truth reasoning. Target 150+ real cases so the metrics reflect real designer behaviour rather than synthesised failure modes.</p>
-        </div>
-      </li>
-      <li class="phase">
-        <span class="pnum">07</span>
-        <div>
-          <h4>Override ingestion <span class="chip chip-accent">next</span></h4>
-          <p>Wire <code>/ds-agent disagree</code> through to <code>evals/overrides.jsonl</code> and a weekly triage that turns overrides into eval cases or rulebook amendments. This is what makes the system improve rather than plateau.</p>
-        </div>
-      </li>
-      <li class="phase">
-        <span class="pnum">08</span>
-        <div>
-          <h4>Rule telemetry <span class="chip chip-accent">next</span></h4>
-          <p>Which rules fire most, and which get overridden most. A rule with a high override rate is a wrong rule; a rule that fires constantly marks a part of Blade designers consistently misunderstand. That is an organisational signal, not a code check.</p>
-        </div>
-      </li>
-    </ol>
-
-    <h2 id="buildbuy">12 · Build versus buy</h2>
-
-    <p>
-      I evaluated <strong>Graphify</strong> for the knowledge-graph layer. It does hybrid
-      extraction — tree-sitter for code, LLM extraction for docs — and exposes an MCP server
-      and an HTML visualisation, so the temptation was real.
-    </p>
-
-    <p>
-      I used the idea for the unstructured layer and rejected it for the code layer, for two
-      reasons. First, a generic code graph yields symbol-level edges
-      (<code>Button.tsx imports tokens.ts</code>), not the design-system-semantic edges the
-      three checks actually need — resolving a styled-components template through a theme
-      object into a specific token, indexed by component and variant, is Blade-specific
-      modelling and is the actual IP here. Second, Graphify labels edges
-      <code>EXTRACTED</code> / <code>INFERRED</code> / <code>AMBIGUOUS</code>, and for a
-      blocking check an inferred cascade edge is a liability, not a feature.
-    </p>
-
-    <p>
-      Writing it directly against the compiler API also collapsed the dependency tree to a
-      single runtime package — <code>typescript</code>, which Blade already ships. The
-      Anthropic call is plain <code>fetch</code>, because a blocking CI check should own its
-      timeout and retry policy rather than inherit them from an SDK.
-    </p>
-
-    <h2 id="limits">13 · Limitations</h2>
-
-    <p>Stated plainly, because a POC that claims no weaknesses is not being read carefully.</p>
-
-    <ul>
-      <li><strong>Prose parsing is heuristic where it is not graph-backed.</strong> This is why prose-derived signals are capped at warning unless the graph proves them. The boundary is enforced in code, but it is a boundary, not a solution.</li>
-      <li><strong>Prop extraction does not resolve cross-file type references.</strong> It builds a local alias table per file and flattens unions and intersections through it, which covers Blade's actual composition patterns, but a prop type imported from another module is not followed. A full type-checker program would fix this at a real cost in extraction time.</li>
-      <li><strong>The judgment layer's contribution is currently unmeasured.</strong> Both eval arms report identical numbers because no API key was available in the build environment, so the offline provider ran in both. The harness is built to show that delta; the delta itself is the first thing to fill in.</li>
-      <li><strong>The two positive controls cannot pass offline.</strong> The offline provider structurally never returns <code>correct</code>, which is honest but means the floor's ceiling is 95.7% by construction, not by failure.</li>
-      <li><strong>The rulebook is my reading of Blade's RFCs.</strong> It is sourced and citable, but a real deployment starts with the design-systems team editing it, which is exactly the intended workflow.</li>
-    </ul>
-
-    <footer>
-      <p>
-        Built against <code>razorpay/blade</code> @ <code>4c07772</code>. Extraction, checks,
-        engine, CLI, CI adapter, unit tests and eval harness run end to end with no API key.
-      </p>
-    </footer>
-
+    </section>
   </main>
-</div>
+
+  <footer><div class="shell"><span>Blade Review · Proof of concept</span><span>Built against Blade @ 4c07772</span></div></footer>
+
+  <script>
+    const graphUI = {
+      data: null,
+      nodes: [],
+      edges: [],
+      selected: null,
+      hovered: null,
+      search: '',
+      mode: 'components',
+      panX: 0,
+      panY: 0,
+      scale: 1,
+      ticks: 0,
+      dragging: null,
+      moved: false,
+    };
+
+    const canvas = document.getElementById('ast-graph');
+    const graphScene = document.getElementById('graph-scene');
+    const searchInput = document.getElementById('graph-search');
+    const modeSelect = document.getElementById('graph-mode');
+    const detailPanel = document.getElementById('graph-detail');
+    const statsLabel = document.getElementById('graph-stats');
+
+    function escapeHTML(value) {
+      return String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
+    }
+
+    function resizeGraph() {
+      fitGraph();
+      drawGraph();
+    }
+
+    function rebuildGraph() {
+      if (!graphUI.data) return;
+      const components = graphUI.data.components;
+      if (graphUI.selected?.startsWith('token:')) {
+        graphUI.selected = graphUI.nodes.find(node => node.id === graphUI.selected)?.data.component || 'Button';
+      }
+      const root = components.find(component => component.name === graphUI.selected) || components[0];
+      graphUI.selected = root.name;
+      const dependencies = components.filter(component => (root.composes || []).includes(component.name));
+      const dependants = components.filter(component => (component.composes || []).includes(root.name));
+      const componentMap = new Map([[root.name, root]]);
+      if (graphUI.mode !== 'tokens') {
+        dependencies.forEach(component => componentMap.set(component.name, component));
+        dependants.forEach(component => componentMap.set(component.name, component));
+      }
+
+      graphUI.nodes = [...componentMap.values()].map(component => ({
+        id: component.name,
+        type: 'component',
+        data: component,
+        x: 0,
+        y: 0,
+        vx: 0,
+        vy: 0,
+      }));
+      graphUI.edges = [];
+      if (graphUI.mode !== 'tokens') {
+        dependencies.forEach(component => graphUI.edges.push({ source: root.name, target: component.name, type: 'dependency' }));
+        dependants.forEach(component => graphUI.edges.push({ source: root.name, target: component.name, type: 'dependent' }));
+      }
+
+      if ((graphUI.mode === 'tokens' || graphUI.mode === 'both') && graphUI.selected) {
+        const usageMap = new Map();
+        graphUI.data.usages
+          .filter(usage => usage.component === graphUI.selected)
+          .forEach(usage => { if (!usageMap.has(usage.tokenPath)) usageMap.set(usage.tokenPath, usage); });
+        [...usageMap.entries()].forEach(([tokenPath, usage]) => {
+          graphUI.nodes.push({
+            id: `token:${tokenPath}`,
+            label: tokenPath,
+            type: 'token',
+            data: usage,
+            x: 0,
+            y: 0,
+            vx: 0,
+            vy: 0,
+          });
+          graphUI.edges.push({ source: graphUI.selected, target: `token:${tokenPath}`, type: 'token' });
+        });
+      }
+
+      layoutTree(root.name, dependencies.map(component => component.name), dependants.map(component => component.name));
+      const componentCount = graphUI.nodes.filter(node => node.type === 'component').length;
+      const tokenCount = graphUI.nodes.filter(node => node.type === 'token').length;
+      statsLabel.textContent = `${componentCount} components · ${tokenCount} tokens · ${graphUI.edges.length} direct edges`;
+      fitGraph();
+      renderDetail();
+      drawGraph();
+    }
+
+    function layoutTree(rootName, dependencyNames, dependantNames) {
+      const nodeMap = new Map(graphUI.nodes.map(node => [node.id, node]));
+      const root = nodeMap.get(rootName);
+      if (root) { root.x = 0; root.y = 0; }
+
+      const placeColumn = (names, x, gap = 58) => {
+        const total = Math.max(0, (names.length - 1) * gap);
+        names.forEach((name, index) => {
+          const node = nodeMap.get(name);
+          if (!node) return;
+          node.x = x;
+          node.y = index * gap - total / 2;
+        });
+      };
+
+      placeColumn(dependencyNames, -270);
+      placeColumn(dependantNames, 270);
+
+      const tokenNodes = graphUI.nodes.filter(node => node.type === 'token');
+      if (tokenNodes.length) {
+        const columns = Math.min(5, Math.max(1, Math.ceil(Math.sqrt(tokenNodes.length))));
+        const cellWidth = 180;
+        const cellHeight = 52;
+        const startX = -((columns - 1) * cellWidth) / 2;
+        tokenNodes.forEach((node, index) => {
+          node.x = startX + (index % columns) * cellWidth;
+          node.y = 180 + Math.floor(index / columns) * cellHeight;
+        });
+      }
+    }
+
+    function fitGraph() {
+      const bounds = canvas.getBoundingClientRect();
+      if (!graphUI.nodes.length || !bounds.width) return;
+      const xs = graphUI.nodes.map(node => node.x);
+      const ys = graphUI.nodes.map(node => node.y);
+      const minX = Math.min(...xs) - 110;
+      const maxX = Math.max(...xs) + 110;
+      const minY = Math.min(...ys) - 70;
+      const maxY = Math.max(...ys) + 70;
+      graphUI.scale = Math.min(bounds.width / Math.max(maxX - minX, 1), bounds.height / Math.max(maxY - minY, 1), 1.15);
+      graphUI.panX = bounds.width / 2 - ((minX + maxX) / 2) * graphUI.scale;
+      graphUI.panY = bounds.height / 2 - ((minY + maxY) / 2) * graphUI.scale;
+    }
+
+    function drawGraph() {
+      const nodeMap = new Map(graphUI.nodes.map(node => [node.id, node]));
+      const signature = `${graphUI.nodes.map(node => node.id).join('|')}::${graphUI.edges.map(edge => `${edge.source}>${edge.target}:${edge.type}`).join('|')}`;
+      if (graphScene.dataset.signature !== signature) {
+        graphScene.dataset.signature = signature;
+        graphScene.replaceChildren();
+        graphUI.edges.forEach((edge, index) => {
+          const line = document.createElement('i');
+          line.className = `graph-edge ${edge.type}`;
+          line.dataset.edgeIndex = String(index);
+          graphScene.appendChild(line);
+        });
+        const branchNames = { dependency: 'Built from', dependent: 'Used by', token: 'Uses tokens' };
+        Object.entries(branchNames).forEach(([type, label]) => {
+          if (!graphUI.edges.some(edge => edge.type === type)) return;
+          const branch = document.createElement('span');
+          branch.className = 'graph-branch-label';
+          branch.dataset.branch = type;
+          branch.textContent = label;
+          graphScene.appendChild(branch);
+        });
+        graphUI.nodes.forEach((node, index) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = `graph-node ${node.type}`;
+          button.dataset.nodeIndex = String(index);
+          button.setAttribute('aria-label', `${node.type === 'token' ? 'Token' : 'Component'} ${node.label || node.id}`);
+          const label = document.createElement('span');
+          label.className = 'graph-node-label';
+          button.appendChild(label);
+          graphScene.appendChild(button);
+        });
+      }
+
+      graphScene.style.transform = `translate(${graphUI.panX}px, ${graphUI.panY}px) scale(${graphUI.scale})`;
+      graphScene.querySelectorAll('.graph-edge').forEach((element, index) => {
+        const edge = graphUI.edges[index];
+        const source = nodeMap.get(edge.source);
+        const target = nodeMap.get(edge.target);
+        if (!source || !target) { element.style.display = 'none'; return; }
+        const dx = target.x - source.x;
+        const dy = target.y - source.y;
+        const active = graphUI.selected && (source.id === graphUI.selected || target.id === graphUI.selected);
+        element.style.display = 'block';
+        element.style.left = `${source.x}px`;
+        element.style.top = `${source.y}px`;
+        element.style.width = `${Math.hypot(dx, dy)}px`;
+        element.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
+        element.classList.toggle('active', Boolean(active));
+      });
+
+      graphScene.querySelectorAll('.graph-branch-label').forEach(element => {
+        const type = element.dataset.branch;
+        const targets = graphUI.edges.filter(edge => edge.type === type).map(edge => nodeMap.get(edge.target)).filter(Boolean);
+        if (!targets.length) return;
+        const x = type === 'dependency' ? -270 : type === 'dependent' ? 270 : 0;
+        const y = type === 'token' ? 130 : Math.min(...targets.map(node => node.y)) - 40;
+        element.style.left = `${x}px`;
+        element.style.top = `${y}px`;
+      });
+
+      graphScene.querySelectorAll('.graph-node').forEach((element, index) => {
+        const node = graphUI.nodes[index];
+        const isSelected = node.id === graphUI.selected;
+        const isHovered = node.id === graphUI.hovered;
+        const matches = graphUI.search && (node.label || node.id).toLowerCase().includes(graphUI.search);
+        element.style.left = `${node.x}px`;
+        element.style.top = `${node.y}px`;
+        element.classList.toggle('selected', isSelected);
+        element.classList.toggle('hovered', isHovered);
+        element.classList.toggle('match', Boolean(matches));
+        const labelElement = element.querySelector('.graph-node-label');
+        labelElement.textContent = (node.label || node.id).length > 31 ? `${(node.label || node.id).slice(0, 29)}…` : (node.label || node.id);
+      });
+    }
+
+    function renderDetail() {
+      if (!graphUI.data || !graphUI.selected) {
+        detailPanel.innerHTML = '<p class="detail-empty">Select a component to inspect its AST metadata and local relationships.</p>';
+        return;
+      }
+      if (graphUI.selected.startsWith('token:')) {
+        const tokenPath = graphUI.selected.slice(6);
+        const token = graphUI.data.tokens.find(item => item.path === tokenPath);
+        const consumers = [...new Set(graphUI.data.usages.filter(usage => usage.tokenPath === tokenPath).map(usage => usage.component))];
+        detailPanel.innerHTML = `<p class="eyebrow">Token node</p><h3>${escapeHTML(tokenPath)}</h3><p>${escapeHTML(token?.file || 'Source not resolved')}</p><div class="detail-grid"><div class="detail-stat"><strong>${consumers.length}</strong><span>Consumers</span></div><div class="detail-stat"><strong>${escapeHTML(token?.scope || '—')}</strong><span>Scope</span></div></div><div class="detail-block"><strong>Value</strong><p>${escapeHTML(token?.value ?? 'Aliased or computed')}</p></div><div class="detail-block"><strong>Used by</strong><p>${escapeHTML(consumers.slice(0, 12).join(', ') || 'No extracted consumers')}${consumers.length > 12 ? ` +${consumers.length - 12} more` : ''}</p></div>`;
+        return;
+      }
+      const component = graphUI.data.components.find(item => item.name === graphUI.selected);
+      if (!component) return;
+      const composedBy = graphUI.data.components.filter(item => (item.composes || []).includes(component.name)).map(item => item.name);
+      const tokens = [...new Set(graphUI.data.usages.filter(usage => usage.component === component.name).map(usage => usage.tokenPath))];
+      const variants = component.props.filter(prop => prop.isVariantAxis).map(prop => `${prop.name}: ${prop.allowedValues.join(' | ')}`);
+      const platforms = [component.platforms.web && 'web', component.platforms.native && 'native'].filter(Boolean).join(' + ') || 'shared / unresolved';
+      detailPanel.innerHTML = `<p class="eyebrow">Component node</p><h3>${escapeHTML(component.name)}</h3><p>${escapeHTML(component.dir)}</p><div class="detail-grid"><div class="detail-stat"><strong>${component.props.length}</strong><span>Props</span></div><div class="detail-stat"><strong>${tokens.length}</strong><span>Tokens</span></div><div class="detail-stat"><strong>${component.composes.length}</strong><span>Composes</span></div><div class="detail-stat"><strong>${composedBy.length}</strong><span>Used by</span></div></div><div class="detail-block"><strong>Platforms</strong><p>${escapeHTML(platforms)}</p></div><div class="detail-block"><strong>Variant axes</strong><p>${escapeHTML(variants.join(' · ') || 'No literal-union variants extracted')}</p></div><div class="detail-block"><strong>Composes</strong><p>${escapeHTML(component.composes.join(', ') || 'No direct component edges')}</p></div><div class="detail-block"><strong>Composed by</strong><p>${escapeHTML(composedBy.join(', ') || 'No direct dependants')}</p></div><div class="detail-block"><strong>Documentation</strong><p>${component.hasDecisionsDoc ? escapeHTML(component.decisionsDocPath) : 'No decisions document extracted'}</p></div>`;
+    }
+
+    function graphPoint(event) {
+      const rect = canvas.getBoundingClientRect();
+      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    }
+
+    function hitNode(point) {
+      const x = (point.x - graphUI.panX) / graphUI.scale;
+      const y = (point.y - graphUI.panY) / graphUI.scale;
+      let nearest = null;
+      graphUI.nodes.forEach(node => {
+        const halfWidth = node.type === 'token' ? 82 : 60;
+        if (Math.abs(node.x - x) <= halfWidth && Math.abs(node.y - y) <= 22) nearest = node;
+      });
+      return nearest;
+    }
+
+    canvas.addEventListener('pointerdown', event => {
+      const point = graphPoint(event);
+      graphUI.dragging = { pan: true, x: point.x, y: point.y, panX: graphUI.panX, panY: graphUI.panY };
+      graphUI.moved = false;
+      canvas.setPointerCapture(event.pointerId);
+    });
+    canvas.addEventListener('pointermove', event => {
+      const point = graphPoint(event);
+      if (graphUI.dragging) {
+        graphUI.moved = true;
+        graphUI.panX = graphUI.dragging.panX + point.x - graphUI.dragging.x;
+        graphUI.panY = graphUI.dragging.panY + point.y - graphUI.dragging.y;
+        drawGraph();
+      } else {
+        const hovered = hitNode(point)?.id || null;
+        if (hovered !== graphUI.hovered) { graphUI.hovered = hovered; drawGraph(); }
+      }
+    });
+    canvas.addEventListener('pointerup', event => {
+      const point = graphPoint(event);
+      const node = hitNode(point);
+      if (!graphUI.moved && node) {
+        graphUI.selected = node.id;
+        if (node.type === 'component') searchInput.value = node.id;
+        if (node.type === 'component') rebuildGraph();
+        else { renderDetail(); drawGraph(); }
+      }
+      graphUI.dragging = null;
+    });
+    canvas.addEventListener('wheel', event => {
+      event.preventDefault();
+      const point = graphPoint(event);
+      const oldScale = graphUI.scale;
+      const factor = event.deltaY < 0 ? 1.12 : .89;
+      graphUI.scale = Math.max(.22, Math.min(2.6, oldScale * factor));
+      const worldX = (point.x - graphUI.panX) / oldScale;
+      const worldY = (point.y - graphUI.panY) / oldScale;
+      graphUI.panX = point.x - worldX * graphUI.scale;
+      graphUI.panY = point.y - worldY * graphUI.scale;
+      drawGraph();
+    }, { passive: false });
+
+    searchInput.addEventListener('input', () => {
+      graphUI.search = searchInput.value.trim().toLowerCase();
+      const exact = graphUI.data?.components.find(component => component.name.toLowerCase() === graphUI.search);
+      if (exact) {
+        graphUI.selected = exact.name;
+        rebuildGraph();
+      } else {
+        drawGraph();
+      }
+    });
+    searchInput.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' || !graphUI.data) return;
+      const match = graphUI.data.components.find(component => component.name.toLowerCase().includes(graphUI.search));
+      if (!match) return;
+      graphUI.selected = match.name;
+      searchInput.value = match.name;
+      graphUI.search = match.name.toLowerCase();
+      rebuildGraph();
+    });
+    modeSelect.addEventListener('change', () => {
+      if (graphUI.selected?.startsWith('token:')) {
+        graphUI.selected = graphUI.nodes.find(node => node.id === graphUI.selected)?.data.component || 'Button';
+      }
+      graphUI.mode = modeSelect.value;
+      rebuildGraph();
+    });
+
+    fetch('./data/blade-graph.json')
+      .then(response => {
+        if (!response.ok) throw new Error(`Graph request failed: ${response.status}`);
+        return response.json();
+      })
+      .then(data => {
+        graphUI.data = data;
+        graphUI.selected = data.components.some(component => component.name === 'Button') ? 'Button' : data.components[0]?.name;
+        searchInput.setAttribute('list', 'component-names');
+        const list = document.createElement('datalist');
+        list.id = 'component-names';
+        data.components.forEach(component => {
+          const option = document.createElement('option');
+          option.value = component.name;
+          list.appendChild(option);
+        });
+        document.body.appendChild(list);
+        rebuildGraph();
+      })
+      .catch(error => {
+        statsLabel.textContent = 'Graph unavailable';
+        detailPanel.innerHTML = `<p class="detail-empty">${escapeHTML(error.message)}. Run the POC through its local server so the extracted graph can load.</p>`;
+      });
+
+    new ResizeObserver(resizeGraph).observe(canvas);
+
+    async function copyCommand(button) {
+      const text = document.getElementById('command-text').textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        button.textContent = 'Copied';
+        setTimeout(() => { button.textContent = 'Copy'; }, 1600);
+      } catch {
+        button.textContent = 'Select';
+      }
+    }
+  </script>
+</body>
+</html>

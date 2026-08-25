@@ -20,7 +20,7 @@ export interface GitHubReview {
   event: 'REQUEST_CHANGES' | 'COMMENT' | 'APPROVE';
   body: string;
   /** Inline comments, anchored to a file where the finding carries one. */
-  comments: { path: string; body: string }[];
+  comments: { path: string; line: number; side: 'RIGHT'; body: string }[];
   /** Reviewers to request. Populated for needs_human. */
   requestReviewers: string[];
   /** Check-run conclusion, kept separate from the review event. */
@@ -35,7 +35,11 @@ const TITLE: Record<Verdict['status'], string> = {
   needs_human: '### 🔍 Architecture check: design systems review requested',
 };
 
-export function toGitHubReview(v: Verdict, dsTeam = 'razorpay/design-system'): GitHubReview {
+export function toGitHubReview(
+  v: Verdict,
+  dsTeam = 'razorpay/design-system',
+  requestHumanReview = true,
+): GitHubReview {
   const body: string[] = [HEADER, TITLE[v.status], '', v.summary, ''];
 
   if (v.status === 'correct') {
@@ -88,7 +92,9 @@ export function toGitHubReview(v: Verdict, dsTeam = 'razorpay/design-system'): G
     body.push(
       `---`,
       '',
-      `This one needs a human. ${v.confidence < 0.5 ? 'The agent could not reach a confident conclusion' : 'The agent is below the confidence threshold for an automatic verdict'}, so it is not blocking the PR — @${dsTeam} has been asked to take a look, and the analysis above is a starting point.`,
+      requestHumanReview
+        ? `This one needs a human. ${v.confidence < 0.5 ? 'The agent could not reach a confident conclusion' : 'The agent is below the confidence threshold for an automatic verdict'}, so it is not blocking the PR — @${dsTeam} has been asked to take a look, and the analysis above is a starting point.`
+        : `This one needs a human. ${v.confidence < 0.5 ? 'The agent could not reach a confident conclusion' : 'The agent is below the confidence threshold for an automatic verdict'}, so it is not blocking the PR. Reviewer assignment is disabled for this repository-local demo; the analysis above is the handoff.`,
       '',
     );
   }
@@ -104,11 +110,13 @@ export function toGitHubReview(v: Verdict, dsTeam = 'razorpay/design-system'): G
   }
 
   // Inline comments with suggestion blocks, where the finding names a file.
-  const comments: { path: string; body: string }[] = [];
+  const comments: GitHubReview['comments'] = [];
   for (const f of v.findings) {
-    if (!f.suggestion?.file) continue;
+    if (!f.suggestion?.file || !f.suggestion.line) continue;
     comments.push({
       path: f.suggestion.file,
+      line: f.suggestion.line,
+      side: 'RIGHT',
       body: [
         `**${f.ruleId}** — ${f.message}`,
         '',
@@ -123,7 +131,7 @@ export function toGitHubReview(v: Verdict, dsTeam = 'razorpay/design-system'): G
     event: v.status === 'incorrect' ? 'REQUEST_CHANGES' : 'COMMENT',
     body: body.join('\n'),
     comments,
-    requestReviewers: v.status === 'needs_human' ? [dsTeam] : [],
+    requestReviewers: v.status === 'needs_human' && requestHumanReview ? [dsTeam] : [],
     // needs_human is explicitly `neutral`, not `failure`. Deferring to a human must
     // never look like a broken build, or teams will start ignoring the check.
     conclusion: v.status === 'incorrect' ? 'failure' : v.status === 'correct' ? 'success' : 'neutral',

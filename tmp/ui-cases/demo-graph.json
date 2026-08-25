@@ -1,0 +1,94 @@
+{
+  "bladeRef": "demo-fixture",
+  "extractedAt": "2026-08-25T00:00:00.000Z",
+  "tokens": [
+    { "path": "spacing.0", "scope": "global", "category": "spacing", "value": 0, "file": "demo/tokens.ts", "line": 1 },
+    { "path": "spacing.1", "scope": "global", "category": "spacing", "value": 4, "file": "demo/tokens.ts", "line": 2 },
+    { "path": "spacing.2", "scope": "global", "category": "spacing", "value": 8, "file": "demo/tokens.ts", "line": 3 },
+    { "path": "spacing.3", "scope": "global", "category": "spacing", "value": 12, "file": "demo/tokens.ts", "line": 4 },
+    { "path": "spacing.5", "scope": "global", "category": "spacing", "value": 16, "file": "demo/tokens.ts", "line": 5 },
+    { "path": "border.radius.small", "scope": "global", "category": "border", "value": 4, "file": "demo/tokens.ts", "line": 6 },
+    { "path": "border.radius.medium", "scope": "global", "category": "border", "value": 12, "file": "demo/tokens.ts", "line": 7 }
+  ],
+  "components": [
+    {
+      "name": "Box",
+      "dir": "packages/blade/src/components/Box",
+      "props": [],
+      "tokenFiles": [],
+      "platforms": { "web": true, "native": true },
+      "hasDecisionsDoc": false,
+      "composes": []
+    },
+    {
+      "name": "Typography",
+      "dir": "packages/blade/src/components/Typography",
+      "props": [],
+      "tokenFiles": [],
+      "platforms": { "web": true, "native": true },
+      "hasDecisionsDoc": false,
+      "composes": []
+    },
+    {
+      "name": "Button",
+      "dir": "packages/blade/src/components/Button",
+      "props": [
+        {
+          "name": "variant",
+          "allowedValues": ["primary", "secondary", "tertiary"],
+          "optional": true,
+          "isVariantAxis": true,
+          "type": "'primary' | 'secondary' | 'tertiary'",
+          "file": "packages/blade/src/components/Button/types.ts",
+          "line": 1
+        }
+      ],
+      "tokenFiles": ["packages/blade/src/components/Button/buttonTokens.ts"],
+      "platforms": { "web": true, "native": true },
+      "hasDecisionsDoc": false,
+      "composes": []
+    },
+    {
+      "name": "Link",
+      "dir": "packages/blade/src/components/Link",
+      "props": [],
+      "tokenFiles": [],
+      "platforms": { "web": true, "native": true },
+      "hasDecisionsDoc": false,
+      "composes": []
+    },
+    {
+      "name": "Input",
+      "dir": "packages/blade/src/components/Input",
+      "props": [],
+      "tokenFiles": [],
+      "platforms": { "web": true, "native": true },
+      "hasDecisionsDoc": false,
+      "composes": []
+    },
+    {
+      "name": "List",
+      "dir": "packages/blade/src/components/List",
+      "props": [],
+      "tokenFiles": [],
+      "platforms": { "web": true, "native": true },
+      "hasDecisionsDoc": false,
+      "composes": []
+    },
+    {
+      "name": "Table",
+      "dir": "packages/blade/src/components/Table",
+      "props": [],
+      "tokenFiles": [],
+      "platforms": { "web": true, "native": true },
+      "hasDecisionsDoc": false,
+      "composes": []
+    }
+  ],
+  "usages": [],
+  "documents": {},
+  "stats": {
+    "demoComponents": 7,
+    "demoTokens": 7
+  }
+}

@@ -30,6 +30,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Checkout Blade base commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .blade-base
+
       - name: Checkout review agent
         uses: actions/checkout@v4
         with:
@@ -42,13 +48,15 @@ jobs:
 
       - name: Install agent
         working-directory: .ds-agent
-        run: npm ci --omit=dev
+        run: npm ci
 
-      # The knowledge graph is rebuilt from the PR's own checkout, so the agent
-      # reviews against the Blade the PR is actually modifying — not a stale index.
+      # Head facts drive cascade/final-state checks; base facts drive prior-art
+      # checks so code introduced by this PR is not mistaken for pre-existing code.
       - name: Build knowledge graph
         working-directory: .ds-agent
-        run: npx tsx src/cli/extract.ts --blade "$GITHUB_WORKSPACE" --out data/blade-graph.json
+        run: |
+          npx tsx src/cli/extract.ts --blade "$GITHUB_WORKSPACE" --out data/blade-graph.json
+          npx tsx src/cli/extract.ts --blade "$GITHUB_WORKSPACE/.blade-base" --out data/blade-base-graph.json
 
       - name: Review PR
         working-directory: .ds-agent
@@ -56,6 +64,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # Without the key the agent still runs, at the deterministic floor.
-        run: npx tsx src/cli/ci.ts --graph data/blade-graph.json --team razorpay/design-system
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          # Without either key the agent still runs, at the deterministic floor.
+        run: npx tsx src/cli/ci.ts --graph data/blade-graph.json --base-graph data/blade-base-graph.json --team razorpay/design-system

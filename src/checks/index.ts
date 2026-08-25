@@ -1,5 +1,5 @@
 /**
- * Layer 1 — deterministic checks.
+ * Layer 1A/1B — deterministic checks and semantic UI-structure reuse.
  *
  * Every finding here is computed from the change model and the knowledge graph.
  * No model call, no ambiguity, no variance between runs. These checks exist for
@@ -14,8 +14,11 @@ import type { Finding } from '../types.js';
 import type { BladeGraph } from '../extract/graph.js';
 import type { ChangeModel } from './changeModel.js';
 import { rule } from '../knowledge/rulebook.js';
+import { COMPOSITION_CHECKS } from './composition.js';
+import { RENDER_CHECKS } from './render.js';
+import { STRUCTURE_CHECKS } from './structure.js';
 
-type Check = (m: ChangeModel, g: BladeGraph) => Finding[];
+type Check = (m: ChangeModel, g: BladeGraph, prior: BladeGraph) => Finding[];
 
 /** Severity floor: prose-only signals never block. */
 function sev(m: ChangeModel, desired: 'blocker' | 'warning'): 'blocker' | 'warning' {
@@ -44,7 +47,12 @@ const checkLiteralValues: Check = (m, g) => {
           : `No existing token holds this value. A colour that is genuinely new needs a token, not a literal — see REUSE-002 for where it should live.`,
       ],
       suggestion: suggestion
-        ? { file: lit.file, before: lit.value, after: `'${suggestion.path}'` }
+        ? {
+            file: lit.file,
+            line: lit.lineNumber,
+            before: lit.line,
+            after: lit.line.replace(lit.value, `'${suggestion.path}'`),
+          }
         : undefined,
       provenance: 'DETERMINISTIC',
     });
@@ -66,7 +74,12 @@ const checkLiteralValues: Check = (m, g) => {
           : `No token holds the value ${numeric}. Blade's scale is deliberate — a value off the scale usually means the design should snap to an existing step.`,
       ],
       suggestion: suggestion
-        ? { file: lit.file, before: lit.raw, after: `'${suggestion.path}'` }
+        ? {
+            file: lit.file,
+            line: lit.lineNumber,
+            before: lit.line,
+            after: lit.line.replace(lit.raw, `'${suggestion.path}'`),
+          }
         : undefined,
       provenance: 'DETERMINISTIC',
     });
@@ -93,6 +106,8 @@ const checkConditionalStyling: Check = (m) => {
         r.source,
       ],
       suggestion: {
+        file: m.conditionalBranches[0].file,
+        line: m.conditionalBranches[0].lineNumber,
         before: m.conditionalBranches[0].line,
         after:
           "// move the mapping into the component token file:\n// <component>Tokens = { <prop>: { <value>: { default: '<token.path>' } } }",
@@ -154,12 +169,12 @@ const checkTokenNaming: Check = (m) => {
 // ---------------------------------------------------------------------------
 // REUSE-001 — duplicate token value
 // ---------------------------------------------------------------------------
-const checkDuplicateToken: Check = (m, g) => {
+const checkDuplicateToken: Check = (m, _g, prior) => {
   const findings: Finding[] = [];
   const r = rule('REUSE-001');
   for (const decl of m.declaredTokens) {
     if (decl.value === undefined) continue;
-    const existing = g.tokensWithValue(decl.value).filter((t) => !t.path.endsWith(`.${decl.path}`));
+    const existing = prior.tokensWithValue(decl.value).filter((t) => !t.path.endsWith(`.${decl.path}`));
     if (!existing.length) continue;
     findings.push({
       ruleId: r.id,
@@ -214,12 +229,12 @@ const checkPrematurePromotion: Check = (m, g) => {
 // ---------------------------------------------------------------------------
 // REUSE-003 — extend an existing variant axis
 // ---------------------------------------------------------------------------
-const checkExistingVariantAxis: Check = (m, g) => {
+const checkExistingVariantAxis: Check = (m, _g, prior) => {
   const findings: Finding[] = [];
   const r = rule('REUSE-003');
 
   for (const component of m.targetComponents) {
-    const axes = g.variantAxes(component);
+    const axes = prior.variantAxes(component);
     if (!axes.length) continue;
 
     for (const value of m.proposedVariantValues) {
@@ -239,7 +254,7 @@ const checkExistingVariantAxis: Check = (m, g) => {
           message: `\`${component}\` already accepts \`${already.prop}="${value}"\`. This variant does not need to be created.`,
           evidence: [
             `${component}.${already.prop} allows: ${already.values.map((v) => `\`${v}\``).join(', ')}.`,
-            `Extracted from source at blade@${g.bladeRef}, not recalled.`,
+            `Extracted from the base source at blade@${prior.bladeRef}, not recalled.`,
             r.source,
           ],
           provenance: 'DETERMINISTIC',
@@ -250,7 +265,7 @@ const checkExistingVariantAxis: Check = (m, g) => {
     // A new prop that duplicates an existing one. Covers both variant-axis props
     // and non-union props (Card.elevation is `keyof Elevation`, not a string union,
     // but proposing to "add an elevation prop to Card" is still duplication).
-    const node = g.component(component);
+    const node = prior.component(component);
     for (const prop of m.proposedProps) {
       const existingAxis = axes.find((a) => a.prop === prop);
       const existingProp = node?.props.find((p) => p.name === prop);
@@ -381,36 +396,45 @@ const checkBaseComponentCascade: Check = (m, g) => {
 const checkCrossPlatformParity: Check = (m, g) => {
   if (m.signalSource === 'prose') return []; // parity is only checkable on a real diff
   const r = rule('CAS-004');
-  const touchedWeb = m.files.filter((f) => /\.web\.tsx?$/.test(f.path));
-  const touchedNative = m.files.filter((f) => /\.native\.tsx?$/.test(f.path));
-  if (touchedWeb.length === touchedNative.length) return [];
-  if (!touchedWeb.length && !touchedNative.length) return [];
+  const bySurface = new Map<string, { component: string; surface: string; web: string[]; native: string[] }>();
+  for (const f of m.files) {
+    const platform = /\.web\.tsx?$/.test(f.path)
+      ? 'web'
+      : /\.native\.tsx?$/.test(f.path)
+        ? 'native'
+        : undefined;
+    if (!platform) continue;
+    const component = f.path.match(/components\/([A-Z][A-Za-z0-9]*)\//)?.[1];
+    if (!component) continue;
+    const surface = f.path.replace(/\.(?:web|native)(?=\.tsx?$)/, '');
+    const key = `${component}|${surface}`;
+    const entry = bySurface.get(key) ?? { component, surface, web: [], native: [] };
+    entry[platform].push(f.path);
+    bySurface.set(key, entry);
+  }
 
-  const missing = touchedWeb.length > touchedNative.length ? 'native' : 'web';
-  const present = missing === 'native' ? touchedWeb : touchedNative;
-
-  // Only flag when the component actually ships the counterpart platform.
-  const relevant = present.filter((f) => {
-    const comp = f.path.match(/components\/([A-Z][A-Za-z0-9]*)\//)?.[1];
-    const node = comp ? g.component(comp) : undefined;
-    return node ? node.platforms[missing === 'native' ? 'native' : 'web'] : true;
-  });
-  if (!relevant.length) return [];
-
-  return [
-    {
+  const findings: Finding[] = [];
+  for (const touched of bySurface.values()) {
+    const { component } = touched;
+    const node = g.component(component);
+    if (!node?.platforms.web || !node.platforms.native) continue;
+    if (!!touched.web.length === !!touched.native.length) continue;
+    const present = touched.web.length ? 'web' : 'native';
+    const missing = present === 'web' ? 'native' : 'web';
+    findings.push({
       ruleId: r.id,
       category: r.category,
       severity: sev(m, 'blocker'),
-      message: `The change edits ${missing === 'native' ? 'web' : 'native'} implementations without a matching ${missing} change.`,
+      message: `The change edits ${component}'s ${present} implementation without a matching ${missing} change.`,
       evidence: [
-        `Edited: ${relevant.map((f) => f.path).join(', ')}.`,
-        `No corresponding .${missing} file was modified.`,
+        `Edited: ${touched[present].join(', ')}.`,
+        `No matching .${missing} implementation was modified for ${touched.surface}.`,
         r.source,
       ],
       provenance: 'DETERMINISTIC',
-    },
-  ];
+    });
+  }
+  return findings;
 };
 
 // ---------------------------------------------------------------------------
@@ -456,13 +480,16 @@ const CHECKS: Check[] = [
   checkBaseComponentCascade,
   checkCrossPlatformParity,
   checkTokenFileLocation,
+  ...COMPOSITION_CHECKS,
+  ...STRUCTURE_CHECKS,
+  ...RENDER_CHECKS,
 ];
 
-export function runDeterministicChecks(m: ChangeModel, g: BladeGraph): Finding[] {
+export function runDeterministicChecks(m: ChangeModel, g: BladeGraph, prior: BladeGraph = g): Finding[] {
   const all: Finding[] = [];
   for (const check of CHECKS) {
     try {
-      all.push(...check(m, g));
+      all.push(...check(m, g, prior));
     } catch (err) {
       // A broken check must never take down a PR gate.
       all.push({
